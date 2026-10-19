@@ -1,0 +1,6 @@
+# Drift, heading and scale over three climbing laps (about 140 m)
+schema: tevv.test.v1
+scenario: vio-long-loop
+drones:
+  Drone1: vio-openvins
+repeats: 1

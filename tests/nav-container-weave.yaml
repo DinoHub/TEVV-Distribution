@@ -1,0 +1,6 @@
+# Weaving between containers to every goal, keeping clear and flying smoothly
+schema: tevv.test.v1
+scenario: nav-container-weave
+drones:
+  Drone1: super-planner
+repeats: 2

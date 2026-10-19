@@ -2,33 +2,36 @@
 # TEVV: the one command. Everything else in this repository is how it works.
 #
 #   ./tevv up | down                       the dashboard (browser entry point)
-#   ./tevv component init <id> --container <image> --kind <kind>
-#   ./tevv component check components/<id>
 #   ./tevv stack list | show <id> | check <id>
-#                                          who can fly a drone (stacks/<id>/stack.yaml; tevv-default built in)
-#   ./tevv run scenarios/<test> [--stack <drone>=<stack>]... [--stack <stack>] [--component components/<id>] [--repeats N]
-#                                          fly a scenario's missions (N runs), each drone by its stack
+#                                          who flies a drone, and how (stacks/<id>/interface.py; tevv-default built in)
+#   ./tevv stack init <id> [--autopilot simpleflight|px4|ardupilot] [--container <image>]
+#                                          a new stack: an interface.py to edit
+#   ./tevv test list | show <test>         tests: which stack flies which drone of a scenario (tests/<id>.yaml)
+#   ./tevv test init <id> --scenario <s> [--drone <drone>=<stack>]...
+#   ./tevv interface <test> [--drone <d>]  what each drone offers its stack: topics, types, rates, the mission
+#   ./tevv run <test> [--repeats N]        fly a test (tests/<id>.yaml); `run scenarios/<s>`: tevv-default flies
+#   ./tevv watch <test> [--drone <d>]      while it runs: saving interface.py restarts that drone's interface
+#   ./tevv logs <test> [--drone <d>] [--container <name>] [-f]
+#                                          interface.py's prints, logs and errors (or a stack container's)
 #   ./tevv results <test> [--format csv|md] one row per run per mission: ended, verdict, observers
 #   ./tevv stop <test>                     stop a running test now
-#   ./tevv observers [--json]              the observer types a scenario can list
-#   ./tevv suite init <id> --from scenarios/<a> scenarios/<b> ...
-#                                          a test suite from scenarios (one campaign each)
-#   ./tevv suite check suites/<id>         the suite and each campaign's test and observers
-#   ./tevv suite run suites/<id> [--stack <drone>=<stack>]... [--stack <stack>] [--component components/<pkg>]
-#                                          fly every campaign of the suite with those stacks
-#   ./tevv suite results <id> [--run <run>] [--format md|csv]
-#                                          per campaign: purpose, runs passed, failed observers
-#   ./tevv suite list | runs <id> | stop <id> [--now]
+#   ./tevv observers [--json]              the observer types a mission can list
+#   ./tevv suite list | init <id> --tests <t>... | check <id> | run <id> | results <id> | runs <id> | stop <id>
+#                                          suites: a list of tests, each with a purpose
+#   ./tevv sdk                             the TEVV SDK's source, for your editor (.tevv/sdk)
 set -euo pipefail
 cd "$(dirname "$0")"
-usage() { sed -n '3,21p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; }
 cmd="${1:-}"; shift || true
 case "$cmd" in
   up)        exec make dashboard "$@" ;;
   down)      exec make dashboard-down ;;
-  component) exec make stacks ARGS="component $*" ;;
   stack)     exec make --no-print-directory stacks ARGS="stack $*" ;;
+  test)      exec make --no-print-directory stacks ARGS="test $*" ;;
+  interface) exec make --no-print-directory stacks ARGS="interface $*" ;;
   run)       exec make campaign ARGS="run $*" ;;
+  watch)     exec make --no-print-directory stacks ARGS="test watch $*" ;;
+  logs)      exec make --no-print-directory stacks ARGS="test logs $*" ;;
   results)   exec make --no-print-directory stacks ARGS="campaign status $*" ;;
   stop)      exec make stacks ARGS="campaign cancel --now $*" ;;
   observers) image="${METRICS_SERVICE_IMAGE:-$(sed -n 's/^METRICS_SERVICE_IMAGE=//p' .env 2>/dev/null | tail -1)}"
@@ -37,6 +40,13 @@ case "$cmd" in
                run) exec make --no-print-directory suite ARGS="$*" ;;
                *)   exec make --no-print-directory stacks ARGS="suite $*" ;;
              esac ;;
+  sdk)       . ./tools/load-images-env.sh
+             image="${TEVV_INTERFACE_IMAGE:-$(sed -n 's/^TEVV_INTERFACE_IMAGE=//p' .env 2>/dev/null | tail -1)}"
+             [ -n "$image" ] || image="$(sed -n 's/^TEVV_INTERFACE_IMAGE=//p' images/development.generated.env | tail -1)"
+             mkdir -p .tevv/sdk
+             cid="$(docker create "${image:?no TEVV_INTERFACE_IMAGE pinned}")"
+             docker cp "$cid:/opt/mns_component_adaptor/tevv" .tevv/sdk/ >/dev/null && docker rm "$cid" >/dev/null
+             echo "TEVV SDK from $image in .tevv/sdk/tevv (point your editor's Python path at .tevv/sdk)" ;;
   ""|-h|--help|help) usage ;;
   *) echo "tevv: unknown command '$cmd'" >&2; usage >&2; exit 2 ;;
 esac

@@ -1,17 +1,12 @@
-# A TEVV test suite (tevv.suite.v1), an example to copy. Each campaign is a folder
-# under campaigns/ holding its run request (CampaignSpec.yaml: its scenario, how
-# many runs) and its scenario (ScenarioSpec.yaml: the test and its observers).
-schema: tevv.suite.v1
-id: vio-nav-stack
+# A TEVV test suite (tevv.suite.v2), an example to copy: a list of tests (tests/<id>.yaml),
+# run in order, each as written (its scenario, which stack flies each drone, how many runs).
+schema: tevv.suite.v2
 name: VIO navigation stack suite
-description: >-
-  A whole stack that estimates its own pose and flies on it: the planner
-  suite's open course and detour, judged on navigation and on the estimate the
-  stack navigated with. TEVV takes off and hands over; the stack flies from the
-  stereo pair, the IMU and the registered point cloud.
-intended_for: [stack]
-campaigns:
-  - id: stack-open-course
-    purpose: Reaching three open goals on its own estimate
-  - id: stack-detour
-    purpose: Finding a way round a container row on its own estimate
+description: 'A whole stack that estimates its own pose and flies on it: the planner suite''s open course and detour,
+  judged on navigation and on the estimate the stack navigated with. TEVV takes off and hands over; the stack flies
+  from the stereo pair, the IMU and the registered point cloud.'
+tests:
+- test: stack-open-course
+  purpose: Reaching three open goals on its own estimate
+- test: stack-detour
+  purpose: Finding a way round a container row on its own estimate

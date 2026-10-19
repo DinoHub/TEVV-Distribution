@@ -1,0 +1,6 @@
+# Finding a way round a container row on its own estimate
+schema: tevv.test.v1
+scenario: stack-detour
+drones:
+  Drone1: vio-nav-stack
+repeats: 2
