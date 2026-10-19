@@ -173,7 +173,7 @@ images:
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:d8515f130abab5f46896a35c826d166e7f3930afe511ae558cd91f770925f0ff
+    digest: sha256:6897c455774281315103c10da97f3cc9db52eb869c0ede8d325ea289653a91b6
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -208,6 +208,9 @@ images:
       (#154): stacks are stacks/<id>/interface.py on the TEVV SDK (autopilot
       per drone, SimpleFlight with no SITL), tests/<t>.yaml binds a stack to
       each drone, suites list tests; component.yaml and --component removed.
+      Rebuilt under the same tag from 0bea501 (#154): stack names carry no
+      autopilot; ScenarioSpec from MnS-ScenarioSpec 129123e (#10), where a
+      scenario's own runtime.profile/autopilot is legacy.
 
   v1_interface:
     repo: dhdevspace/auto_mns
