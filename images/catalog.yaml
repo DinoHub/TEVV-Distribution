@@ -173,7 +173,7 @@ images:
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:070f8b068a2103f96b5814f99983abe232d1931f87553c22ef0839dc3e702885
+    digest: sha256:d8515f130abab5f46896a35c826d166e7f3930afe511ae558cd91f770925f0ff
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -204,6 +204,27 @@ images:
       time (built-in tevv-default), one supervisor per mission, per-mission
       results and scoring, suites; ScenarioSpec from MnS-ScenarioSpec 507c453
       (#10).
+      Rebuilt under the same tag from feat/multi-drone-missions 550c23b
+      (#154): stacks are stacks/<id>/interface.py on the TEVV SDK (autopilot
+      per drone, SimpleFlight with no SITL), tests/<t>.yaml binds a stack to
+      each drone, suites list tests; component.yaml and --component removed.
+
+  v1_interface:
+    repo: dhdevspace/auto_mns
+    tag: "tevv-interface-v1.1.0-dev"
+    digest: sha256:1c994df13ba3fb72bc83feb68e39a6173eeed4eb9112abf34225beab207fe605
+    channel: pinned
+    source:
+      repo: DinoHub/MnS-Integration-Platform
+      commit: 550c23b
+    purpose: >-
+      tevv-interface (MnS-Integration-Platform platform/stacks/component_adaptor):
+      runs a stack's customer interface, stacks/<id>/interface.py on the TEVV
+      SDK, one container per drone on both DDS domains. The file is mounted,
+      never built. mns-stacks puts this image in every generated stack that
+      flies a stack; TEVV_INTERFACE_IMAGE reaches it through tools/mns-stacks.sh
+      and the dashboard backend. v1.1 development build of
+      feat/multi-drone-missions 550c23b (#154); later dev builds reuse the tag.
 
   v1_packs:
     repo: dhdevspace/auto_mns
@@ -258,7 +279,7 @@ images:
   v1_dashboard_backend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-backend-v1.1.0-dev-bf6922a"
-    digest: sha256:c43a73985ffd9a99b5404156d44b490aef4d7e6d79ee13a5d41b0ab2a984f8e8
+    digest: sha256:8e3acd2055c7c423e641d36944c2c7883516eb3e55e60fdac9fa4bd8c148ba82
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -290,11 +311,14 @@ images:
       run's map and JSON open in a dialog over the page, not a new tab.
       Rebuilt from TEVV-Web-Dashboard feat/multi-drone-missions bf6922a (#142):
       a stack picked per drone, results per mission, Stacks and Suites pages.
+      Rebuilt under the same tag from e3ce7c5 (#142): the dashboard reads tests
+      and stacks (interface.py) and runs a test; no stack pickers; hands a
+      candidate TEVV_INTERFACE_IMAGE to mns-stacks.
 
   v1_dashboard_frontend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-frontend-v1.1.0-dev-bf6922a"
-    digest: sha256:a3e99f8716faca42ab355d8a36a1e338709381a79e53564582e8149001218d8e
+    digest: sha256:649a834df2897697dd9d9e145d60b5720bda47671cc2135290b6c6ab0a0a3a44
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -304,12 +328,13 @@ images:
       b36d1a9), built with the backend above; it bakes no pins. v1.1
       development build of TEVV-Web-Dashboard cabceca, with the backend above.
       Rebuilt from TEVV-Web-Dashboard feat/multi-drone-missions bf6922a (#142),
-      the same commit as the backend.
+      the same commit as the backend. Rebuilt under the same tag from
+      e3ce7c5 (#142), with the backend.
 
   metrics_service:
     repo: dhdevspace/auto_mns
     tag: "tevv-jsonl-ingest-v0.5.0-gcfe09f6"
-    digest: sha256:5a7c5380ab484c56b55868d8c16c6fc9ec1925b21f2b8f8b62d40b7a50e9481e
+    digest: sha256:75e48d1ca51f4a2cd0c611cd75368fb15f6350f6369359ab969c3d51bd61bbbd
     channel: pinned
     source:
       repo: DinoHub/TEVV-Metrics
@@ -332,6 +357,8 @@ images:
       decides goal reached when present.
       Rebuilt from TEVV-Metrics feat/multi-drone-missions cfe09f6 (#22):
       jsonl_ingestor 0.5.0 judges every mission of a run on its own observers.
+      Rebuilt under the same tag from 8b9b6b8 (#22): an observer says what it
+      needs from the stack (needs.output estimate|command, needs.sensor).
 
 consumers:
   # Empty in v1.0.0: its one row (airsim-tools) was removed. product-images.env
@@ -350,6 +377,7 @@ consumers:
       vars:
         MNS_PACKS_IMAGE: v1_packs
         MNS_STACKS_IMAGE: v1_stacks
+        TEVV_INTERFACE_IMAGE: v1_interface
         MNS_AUTHORING_IMAGE: v1_authoring
         MNS_RUNTIME_HOST_IMAGE: v1_runtime_host
         MNS_RUNTIME_HOST_KIT_IMAGE: v1_runtime_host_kit
