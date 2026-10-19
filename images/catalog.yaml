@@ -177,7 +177,7 @@ images:
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:6897c455774281315103c10da97f3cc9db52eb869c0ede8d325ea289653a91b6
+    digest: sha256:b8f47f2b8d642784caa3bda687d171e06ce9eea0a689ce46cb3d5477d6731fc6
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -214,12 +214,15 @@ images:
       each drone, suites list tests; component.yaml and --component removed.
       Rebuilt under the same tag from 0bea501 (#154): stack names carry no
       autopilot; ScenarioSpec from MnS-ScenarioSpec 129123e (#10), where a
-      scenario's own runtime.profile/autopilot is legacy.
+      scenario's own runtime.profile/autopilot is legacy. Rebuilt from 0f8eb68
+      (#154): a stack flying several drones (drones = "many"), a stack you
+      start yourself in your own network (Network(...)), test save and
+      stack list --scenario for the dashboard's picker.
 
   v1_interface:
     repo: dhdevspace/auto_mns
     tag: "tevv-interface-v1.1.0-dev"
-    digest: sha256:1c994df13ba3fb72bc83feb68e39a6173eeed4eb9112abf34225beab207fe605
+    digest: sha256:0949d4c970a1453f1fba0684f8484b68ebe3fcdf0421246dd3dc92306b694c70
     channel: pinned
     source:
       repo: DinoHub/MnS-Integration-Platform
@@ -232,6 +235,7 @@ images:
       flies a stack; TEVV_INTERFACE_IMAGE reaches it through tools/mns-stacks.sh
       and the dashboard backend. v1.1 development build of
       feat/multi-drone-missions 550c23b (#154); later dev builds reuse the tag.
+      Now 0f8eb68: one interface serves every drone of a many-drone stack.
 
   v1_packs:
     repo: dhdevspace/auto_mns
@@ -286,7 +290,7 @@ images:
   v1_dashboard_backend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-backend-v1.1.0-dev-bf6922a"
-    digest: sha256:0d1a18bd2425e79cd171eb686ccb78e435e4e009f95b09cefb83bdf755bd06c1
+    digest: sha256:a8a6e664a4ac271ebf89d67f77780984568866819db2325c6adca3c2c1d0c800
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -323,11 +327,13 @@ images:
       candidate TEVV_INTERFACE_IMAGE to mns-stacks. Rebuilt under the same tag
       from 9db1651 (#142): no Stacks or Test Suites pages (who flies each
       drone is shown in Run; stacks and suites are files run from the CLI).
+      Rebuilt from c151d06 (#142): Run picks each drone's stack and saves it
+      into the test file.
 
   v1_dashboard_frontend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-frontend-v1.1.0-dev-bf6922a"
-    digest: sha256:efbb9f1acdb0444d0907f420e28b0f9ca4a48db46b976c427a8fc257c74ed7d5
+    digest: sha256:87b852f7ec0d583154fe8251c3d39cdc79809155d9354df087d50007fe1ce6ff
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -338,7 +344,7 @@ images:
       development build of TEVV-Web-Dashboard cabceca, with the backend above.
       Rebuilt from TEVV-Web-Dashboard feat/multi-drone-missions bf6922a (#142),
       the same commit as the backend. Rebuilt under the same tag from
-      e3ce7c5 (#142), with the backend; again from 9db1651.
+      e3ce7c5 (#142), with the backend; again from 9db1651, and c151d06.
 
   metrics_service:
     repo: dhdevspace/auto_mns
