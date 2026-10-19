@@ -201,6 +201,9 @@ services:
       - MNS_PACKS_IMAGE=${MNS_PACKS_IMAGE:-}
       # Stack generation, lifecycle, recording and campaigns (mns-stacks).
       - MNS_STACKS_IMAGE=${MNS_STACKS_IMAGE:-}
+      # The image that runs each stack's interface.py; empty = the one
+      # mns-stacks pins. Set (.env) to try a candidate tevv-interface build.
+      - TEVV_INTERFACE_IMAGE=${TEVV_INTERFACE_IMAGE:-}
       # Reported (presence + host label) by the Content phase, and the host
       # the authoring preflight grades against; the generated stacks take the
       # runtime host from MNS_IMAGE_SET_FILE, into which `make dashboard`

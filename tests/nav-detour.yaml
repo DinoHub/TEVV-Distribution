@@ -1,0 +1,6 @@
+# Finding a way round a 30 m container row to a goal behind it
+schema: tevv.test.v1
+scenario: nav-detour
+drones:
+  Drone1: super-planner
+repeats: 2

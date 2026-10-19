@@ -1,0 +1,6 @@
+# Baseline accuracy on an easy box at 1.5 m/s
+schema: tevv.test.v1
+scenario: vio-baseline-box
+drones:
+  Drone1: vio-openvins
+repeats: 2

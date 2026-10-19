@@ -1,0 +1,6 @@
+# Robustness to fast motion and sharp turns at 3 m/s
+schema: tevv.test.v1
+scenario: vio-aggressive-zigzag
+drones:
+  Drone1: vio-openvins
+repeats: 2

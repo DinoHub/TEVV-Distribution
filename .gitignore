@@ -48,3 +48,6 @@ generated/
 /scenarios/fisheye-surround-xfs/phase-state.json
 /scenarios/fisheye-surround-xfs/ScenarioSpec.baseline.yaml
 !/scenarios/vio-reference/**
+
+# The TEVV SDK copied out for an editor (./tevv sdk)
+/.tevv/
