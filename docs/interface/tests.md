@@ -19,7 +19,15 @@ with a mission that the test leaves out is flown by `tevv-default`; a drone
 named in `drones` must have a mission. The schema is
 `platform/stacks/mns_stacks/schemas/tevv-test.v1.schema.json` in the platform.
 
+In the dashboard, the Run step picks the stack for each drone and **Save
+test** writes this file (a new test, or over one). It offers only what can
+fly: a stack whose needs a drone lacks is shown, disabled, with the reason,
+and PX4 with ArduPilot is refused. From a terminal, `test save` does the
+same, with the same checks:
+
 ```bash
+./tevv test save cross-demo --scenario multi-cross-two --drone Drone1=vio-openvins --drone Drone2=super-planner
+./tevv stack list --scenario multi-cross-two   # each stack, and which of the scenario's drones it can fly
 ./tevv test init cross-demo --scenario multi-cross-two --drone Drone1=vio-openvins --drone Drone2=super-planner
 ./tevv test list                    # every test, and who flies each drone on which autopilot
 ./tevv test show cross-demo

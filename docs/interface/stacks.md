@@ -72,8 +72,8 @@ own drone.
 ## The declarations (class attributes)
 
 TEVV reads these **without running your file**, so write them as plain
-values: strings, lists, dicts, `Container(...)` and `Autopilot(...)` with
-plain arguments. An expression (`os.environ[...]`, a function call) is
+values: strings, lists, dicts, `Container(...)`, `Autopilot(...)` and
+`Network(...)` with plain arguments. An expression (`os.environ[...]`, a function call) is
 refused with the line that has it.
 
 | Attribute | Default | What |
@@ -83,6 +83,8 @@ refused with the line that has it.
 | `needs` | `[]` (`["ground_truth"]` for `TevvDefault`) | What the drone must offer: `ground_truth`, `imu`, `gnss`, `lidar`, `point_cloud`, `camera_primary`, `camera:<name>`, `stereo_primary`, `stereo:<name>`. A run refuses a drone that lacks one, naming what it has. |
 | `containers` | `{}` | `name: Container(...)`, started before `setup()` runs. |
 | `ready` | `[]` | Topics on your side that TEVV waits for, after take-off, before it hands the drone over (up to 240 s). |
+| `drones` | `"one"` | `"one"`: an instance flies one drone (a test naming it for two drones runs it twice). `"many"`: one instance flies every drone a test gives it ([below](#one-stack-many-drones)). |
+| `network` | `None` | `Network("<docker network>", domain=<ROS_DOMAIN_ID>)`: a stack you start yourself, in your own Docker network; declare no `containers` ([below](#a-stack-you-start-yourself)). |
 
 ### Choosing an autopilot
 
@@ -201,6 +203,62 @@ class MyVio(TevvDefault):                 # TEVV flies on SimpleFlight
         self.forward(self.imu, "/imu0")
         self.estimate_from("/vio/odom")
 ```
+
+## One stack, many drones
+
+A stack that flies several drones at once, a swarm planner for instance,
+declares `drones = "many"`. A test that names it for several drones gives
+them all to **one** instance: one set of your containers, on one network and
+domain, and one interface joined to every one of those drones. In `setup()`,
+`self.drones` lists a handle per drone, with the same inputs and methods as
+`self` has for a one-drone stack:
+
+```python
+class Swarm(Interface):
+    autopilot = "px4"
+    drones = "many"
+    needs = ["ground_truth"]
+    containers = {"planner": Container(image="me/swarm:1", command="ros2 launch swarm all.launch.py")}
+
+    def setup(self):
+        for d in self.drones:                      # d.name (Drone2), d.mission, d.gt_odom, ...
+            d.forward(d.gt_odom, f"/{d.name}/odom")
+            d.forward(d.next_waypoint, f"/{d.name}/goal")
+            d.command_from(f"/{d.name}/setpoint")
+            d.debug("goal", ...)                   # recorded per drone
+```
+
+Every drone flies on the stack's autopilot. `/clock` reaches your side once;
+each drone's tf arrives as `/tevv/<drone>/tf` and `/tevv/<drone>/tf_static`
+(the drones' frame names are the same). `passthrough()` gives your side
+every drone's `/tevv/<drone>/...` names. An error in your code ends every
+drone's mission. `stacks/follow-many` is a worked example
+(`tests/follow-many.yaml`: three drones, one instance).
+
+## A stack you start yourself
+
+If your stack already runs in your own Docker network on this machine,
+declare where, and no containers:
+
+```python
+class MyPlanner(Interface):
+    autopilot = "px4"
+    network = Network("my-autonomy", domain=0)     # its Docker network and ROS_DOMAIN_ID
+    ready = ["/planner_state"]
+
+    def setup(self):
+        self.forward(self.gt_odom, "/odom")
+        self.command_from("/setpoint")
+```
+
+TEVV starts none of your containers. For each run it joins this interface
+to your network, at a free address it picks there, and talks to your stack
+on your domain with plain multicast discovery, like any container on that
+network. Your domain must differ from the drones' (1, 2, ... by default).
+Start your stack before the run: a run whose network is missing stops
+before anything flies and says so. Your containers' logs stay with you;
+`./tevv logs` has the interface's. `stacks/super-planner-external` is a
+worked example, with the commands to start SUPER in `my-autonomy`.
 
 ## What stays fixed
 
