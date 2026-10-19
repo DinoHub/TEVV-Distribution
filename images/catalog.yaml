@@ -177,7 +177,7 @@ images:
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:b8f47f2b8d642784caa3bda687d171e06ce9eea0a689ce46cb3d5477d6731fc6
+    digest: sha256:5565e736990918822992ba60e0d11aeb043f5290cb726d34f3a00c51c7a8f63f
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -217,7 +217,9 @@ images:
       scenario's own runtime.profile/autopilot is legacy. Rebuilt from 0f8eb68
       (#154): a stack flying several drones (drones = "many"), a stack you
       start yourself in your own network (Network(...)), test save and
-      stack list --scenario for the dashboard's picker.
+      stack list --scenario for the dashboard's picker. Rebuilt from ba69d55:
+      a stack needing the point cloud gets it in odom again, and AirSim's
+      trace (a line every camera rendered) is off.
 
   v1_interface:
     repo: dhdevspace/auto_mns
