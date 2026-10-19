@@ -479,7 +479,7 @@ mission does. Who flies each drone is set by a test file (Step 2).
 
 **Who flies each drone** is set by a **test**: a file in your workspace,
 `tests/<id>.yaml`, naming the scenario, the stack that flies each drone and
-how many runs. The dashboard reads it and never edits it:
+how many runs. The Run step writes it for you (below), or edit it by hand:
 
 ```yaml
 # tests/cross-demo.yaml
@@ -494,20 +494,25 @@ repeats: 1
 A stack is a folder, `stacks/<id>/interface.py`: one Python class that says
 which autopilot the drone flies on (SimpleFlight, PX4 or ArduPilot), the
 sensors it needs, the containers to start, and the code wiring TEVV's topics
-to yours. `tevv-default` (TEVV's follower on SimpleFlight) is built in. See
-[`docs/interface/`](interface/README.md).
+to yours. `tevv-default` (TEVV's follower on SimpleFlight) is built in. A
+stack can fly several drones as one instance (`drones = "many"`), or be one
+you start yourself in your own Docker network (`network = Network(...)`).
+See [`docs/interface/`](interface/README.md).
 
-The Run step lists this scenario's tests and, for the chosen one, who flies
-each drone and on which autopilot. **The scenario on its own** flies
-`tevv-default` on every drone. Leave **Runs** empty to fly the test's own
-count, and click **Run**. Every mission flies at the same time: TEVV takes
+The Run step picks the test (or **New test…**, or **The scenario on its
+own**, which flies `tevv-default` on every drone) and, for each drone with a
+mission, the stack that flies it, with its autopilot and who flies.
+A stack the drone cannot fly (it lacks a sensor the stack needs) is
+disabled, with the reason; PX4 and ArduPilot together are refused.
+**Save test** writes `tests/<id>.yaml`; **Run** saves first when you changed
+a pick. Leave **Runs** empty to fly the test's own count. Every mission flies at the same time: TEVV takes
 each drone off, hands it to its stack, publishes the points, takes it back
 and lands it. A stack that never becomes ready ends its mission `error`
 without stopping the others. The same from a terminal:
 
 ```bash
 ./tevv stack list                                    # who can fly a drone
-./tevv test init my-test --scenario <s> --drone Drone1=vio-openvins
+./tevv test save my-test --scenario <s> --drone Drone1=vio-openvins
 ./tevv interface my-test                             # what each drone offers its stack
 ./tevv run my-test
 ./tevv logs my-test                                  # your interface's prints and errors
