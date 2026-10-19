@@ -286,7 +286,7 @@ images:
   v1_dashboard_backend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-backend-v1.1.0-dev-bf6922a"
-    digest: sha256:8e3acd2055c7c423e641d36944c2c7883516eb3e55e60fdac9fa4bd8c148ba82
+    digest: sha256:0d1a18bd2425e79cd171eb686ccb78e435e4e009f95b09cefb83bdf755bd06c1
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -320,12 +320,14 @@ images:
       a stack picked per drone, results per mission, Stacks and Suites pages.
       Rebuilt under the same tag from e3ce7c5 (#142): the dashboard reads tests
       and stacks (interface.py) and runs a test; no stack pickers; hands a
-      candidate TEVV_INTERFACE_IMAGE to mns-stacks.
+      candidate TEVV_INTERFACE_IMAGE to mns-stacks. Rebuilt under the same tag
+      from 9db1651 (#142): no Stacks or Test Suites pages (who flies each
+      drone is shown in Run; stacks and suites are files run from the CLI).
 
   v1_dashboard_frontend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-frontend-v1.1.0-dev-bf6922a"
-    digest: sha256:649a834df2897697dd9d9e145d60b5720bda47671cc2135290b6c6ab0a0a3a44
+    digest: sha256:efbb9f1acdb0444d0907f420e28b0f9ca4a48db46b976c427a8fc257c74ed7d5
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -336,7 +338,7 @@ images:
       development build of TEVV-Web-Dashboard cabceca, with the backend above.
       Rebuilt from TEVV-Web-Dashboard feat/multi-drone-missions bf6922a (#142),
       the same commit as the backend. Rebuilt under the same tag from
-      e3ce7c5 (#142), with the backend.
+      e3ce7c5 (#142), with the backend; again from 9db1651.
 
   metrics_service:
     repo: dhdevspace/auto_mns
