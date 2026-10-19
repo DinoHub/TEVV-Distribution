@@ -20,8 +20,8 @@ clicking. Section 5 explains each step in full.
 **On the command line** (once):
 
 ```bash
-git clone https://github.com/DinoHub/M-S-Simulation-Runtime-Stack.git
-cd M-S-Simulation-Runtime-Stack
+git clone https://github.com/DinoHub/TEVV-Distribution.git
+cd TEVV-Distribution
 ./setup.sh           # checks the machine, logs in to Docker Hub, pulls the images
 ./download-packs.sh  # downloads the starter levels, ~0.8 GB (logs in to GitHub)
 make dashboard       # run from a terminal on the desktop, not over SSH
@@ -38,25 +38,24 @@ run the same script again; it skips whatever is already done.
 3. In ScenarioLab:
    1. Type a name in **Scenario** and press Enter.
    2. **Environment** → **Level Pack** `warehouse` → **Apply Level Pack**.
-   3. **Runtime** → Autopilot `px4`.
-   4. **Vehicles**: aim the screen centre at the floor → **Add Drone**.
-   5. **Missions**: pick the drone → **Add mission** → aim at the floor and
+   3. **Vehicles**: aim the screen centre at the floor → **Add Drone**.
+   4. **Missions**: pick the drone → **Add mission** → aim at the floor and
       **Add point** two or three times → set **Timeout s** (e.g. 120).
-   6. **Validate** → **Validate**, then **Export**. *Export is the only save.*
+   5. **Validate** → **Validate**, then **Export**. *Export is the only save.*
 4. Back in the dashboard, click your scenario under **Authored scenarios**.
 5. **Generate**: **Generate stack**.
-6. **ROS 2** → **Bag capture**: tick `/ground_truth/odom`, `/imu/data` and
-   `/gps/fix` → **Save & continue to observers**.
-7. **Observers**: keep the defaults → **Save observers**.
-8. **Run**: keep `tevv-default` under *Who flies each drone* → **Run**. The
+6. **Observers**: keep the defaults → **Save observers**.
+7. **Run**: keep **The scenario on its own** (TEVV's follower flies every
+   drone, on SimpleFlight) → **Run**. To fly your own software, write a stack
+   and a test file (section 6, [Bringing your own software](#bringing-your-own-software-a-stack)). The
    run's row says *flying*; **Watch live** opens it on Monitor. It takes off,
    flies the mission's points, lands and stops by itself.
-9. When the row says *done* it shows the verdict (PASS or FAIL, and why) and a
+8. When the row says *done* it shows the verdict (PASS or FAIL, and why) and a
    map of the flight.
-10. Your bag is in `generated/campaigns/<scenario>/runs/<run>/bag/` (each
-    other drone's in `.../runs/<run>/drones/<drone>/bag/`). **Replay →
-    Bags** lists and plays it; with ROS 2 on the host, `ros2 bag info` reads it
-    too.
+9. Your bag is in `generated/campaigns/<scenario>/runs/<run>/bag/` (each
+   other drone's in `.../runs/<run>/drones/<drone>/bag/`). **Replay →
+   Bags** lists and plays it; with ROS 2 on the host, `ros2 bag info` reads it
+   too.
 
 To fly by hand instead, open **Run → Open the stack for manual flying**:
 **Launch**, fly on **Monitor**, then **Stop** (which finalizes the bag into
@@ -93,15 +92,14 @@ docker ps -a --filter name=mns-recorder- -q | xargs -r docker rm -f
 ## 1. How MnS fits together
 
 ```
- ScenarioLab ──export──▶ ScenarioSpec ──generate──▶ Stack ──launch──▶ Simulation ──record──▶ rosbag
- (Unreal editor)          (YAML files)       ▲      (docker compose)   (sim + SITL + ROS 2     (runs/)
-                               │             │                          + components)
-                               │      components/<id>                        │ stop: metrics,
-                               │      (--component)                          ▼ component scores
-                               └──▶ CampaignSpec ──▶ N runs ──────▶ metrics service ──▶ verdict per run
-                                    (Run step)       (one stack each)  (localhost:8770)    (runs/)
-         ▲                                                                   ▲
-         └───────────────── all driven from the dashboard (localhost:3001) ──┘
+ ScenarioLab ──export──▶ ScenarioSpec ─────────────┐        world, drones, missions (+ observers, set in the dashboard)
+ (Unreal editor)          scenarios/<s>/            │
+                                                    ▼
+ your stacks ─────────▶ stacks/<id>/interface.py ─▶ tests/<t>.yaml ──run──▶ N runs ──▶ metrics service ──▶ verdict
+ (Python, TEVV SDK)     autopilot, needs,           which stack flies       (one stack     (localhost:8770)   per mission
+                        containers, wiring          which drone             each)                             per run
+         ▲                                                                                     ▲
+         └──── the dashboard (localhost:3001) reads these files, runs a test and shows it ─────┘
 ```
 
 | MnS term | What it is, in domain terms |
@@ -392,9 +390,9 @@ this order:
      discards everything placed so far.
    - Optional settings here: **Edit MnS Origin** (the ROS frame origin), time
      of day, and a weather preset.
-3. **Runtime**: choose the **Autopilot** (`px4` or `ardupilot`; it applies to
-   the whole scenario). Leave Endpoint on `docker`. Tick the extras you want:
-   QGroundControl, the ROS 2 bridge, MAVROS.
+3. **Runtime**: tick the extras you want: QGroundControl, the ROS 2 bridge,
+   MAVROS. There is no autopilot here: the stack that flies each drone
+   chooses it (SimpleFlight, PX4 or ArduPilot; see [Step 2](#step-2-run)).
 4. **Vehicles**: aim the screen centre at the ground and click **Add Drone**,
    or press **N**.
    - Choose a **Vehicle type** (default `quadrotor_small`) and a **Sensor
@@ -453,43 +451,18 @@ This step validates your ScenarioSpec and turns it into a runnable stack.
   ScenarioLab is the normal way to edit.
 
 Click **Generate stack**. After a few seconds the dashboard moves straight on
-to **ROS 2**, which means it worked. The stack is written to
+to **Observers**, which means it worked. The stack is written to
 `generated/<name>/`.
 
 The badge (*working: authored*, *modified from authored*, …) shows whether the
 spec still matches your export. **Restore authored** returns to the export, and
 **Save as new…** forks the spec under a new name.
 
-**This stack carries ...** reports the components under test the stack was
-generated with (`mns-stacks generate --component <path>`, or your own compose).
-The dashboard keeps them when it regenerates the stack. The Run step picks the
-stack each drone flies with (see [Step 2](#step-2-run)). Cameras are placed in
-ScenarioLab.
+This stack is the scenario on its own, for flying by hand. A run generates a
+stack of its own with the stack the test names for each drone (see
+[Step 2](#step-2-run)). Cameras are placed in ScenarioLab.
 
-### Step 1c: ROS 2 settings and what to record
-
-| Sub-step | What you set |
-|---|---|
-| **Network** | `ROS_DOMAIN_ID`, a network preset, and optionally a CycloneDDS configuration. The defaults work on one machine. |
-| **Topic names** | An optional topic prefix and renames. |
-| **Sensors** | Tweaks to the stack's sensor settings. |
-| **Bag capture** | Which topics to record. |
-
-On **Bag capture**:
-
-1. Leave **Start recording when the stack launches** ticked. Recording then
-   starts automatically.
-2. Tick the topics to record, for example `/ground_truth/odom`, `/imu/data` and
-   `/gps/fix`. The summary line at the top shows the count, e.g. *bag 3/12*.
-   - Before launch the list is worked out from the stack's files, so camera
-     images (`/<camera>/image_raw`) and `/clock` are not offered yet. They
-     appear here once the stack is running, and the list then reads *live from
-     ros2-tools*.
-   - If you tick nothing, **everything** is recorded, which with cameras is
-     gigabytes per minute.
-3. Click **Save & continue to observers**.
-
-### Step 1d: Observers
+### Step 1c: Observers
 
 The scenario is the test: each drone's mission (its points, reach radius,
 speed and time budget) is authored in ScenarioLab's **Missions** tab, and
@@ -500,30 +473,46 @@ estimate accuracy and more), each with a check (*at most*, *at least*,
 the mission at the top first. **Save observers** writes them into the
 scenario's `ScenarioSpec.yaml` and regenerates the stack. A mission passes
 when every observer with a check passes; a run passes only when every
-mission does. Who flies each drone is picked when you run (Step 2).
-
-To keep several tests together, each with a purpose, and run them all with
-the same stacks, gather them into a test suite: see [Test suites](#test-suites).
+mission does. Who flies each drone is set by a test file (Step 2).
 
 ### Step 2: Run
 
-**Who flies each drone**: one picker per drone with a mission, listing the
-stacks (default `tevv-default`, TEVV flying the mission's points; the
-workspace's `stacks/<id>/stack.yaml`, shown on the dashboard's **Stacks**
-page; with a single mission, also a component package). Pick **Runs** and
-**Run**. Every mission flies at the same time: TEVV takes each drone off,
-hands it to its stack, publishes the points, takes it back and lands it. A
-stack that never becomes ready ends its mission `error` without stopping
-the others. The same from a terminal:
+**Who flies each drone** is set by a **test**: a file in your workspace,
+`tests/<id>.yaml`, naming the scenario, the stack that flies each drone and
+how many runs. The dashboard reads it and never edits it:
+
+```yaml
+# tests/cross-demo.yaml
+schema: tevv.test.v1
+scenario: multi-cross-two
+drones:                       # a drone with a mission that is not listed flies tevv-default
+  Drone1: vio-openvins
+  Drone2: super-planner
+repeats: 1
+```
+
+A stack is a folder, `stacks/<id>/interface.py`: one Python class that says
+which autopilot the drone flies on (SimpleFlight, PX4 or ArduPilot), the
+sensors it needs, the containers to start, and the code wiring TEVV's topics
+to yours. `tevv-default` (TEVV's follower on SimpleFlight) is built in. See
+[`docs/interface/`](interface/README.md).
+
+The Run step lists this scenario's tests and, for the chosen one, who flies
+each drone and on which autopilot. **The scenario on its own** flies
+`tevv-default` on every drone. Leave **Runs** empty to fly the test's own
+count, and click **Run**. Every mission flies at the same time: TEVV takes
+each drone off, hands it to its stack, publishes the points, takes it back
+and lands it. A stack that never becomes ready ends its mission `error`
+without stopping the others. The same from a terminal:
 
 ```bash
 ./tevv stack list                                    # who can fly a drone
-./tevv run scenarios/<s> --stack Drone1=vio-openvins --stack Drone2=super-planner
-./tevv results <s>                                   # one row per run per mission: mission, drone, stack, ended, verdict
+./tevv test init my-test --scenario <s> --drone Drone1=vio-openvins
+./tevv interface my-test                             # what each drone offers its stack
+./tevv run my-test
+./tevv logs my-test                                  # your interface's prints and errors
+./tevv results my-test                               # one row per run per mission: mission, drone, stack, ended, verdict
 ```
-
-`--stack <id>` without `drone=`, or `--component DIR`, works only with one
-mission; naming nothing, `tevv-default` flies every mission.
 
 Each run brings up a stack of its own, flies the missions, records, and is
 judged. The run panel lists every run up front:
@@ -632,7 +621,7 @@ Always stop through the dashboard. A bag killed mid-write has no
 ### Step 5: Get your rosbag
 
 Everything a run produces is inside the folder you cloned
-(`M-S-Simulation-Runtime-Stack/`). A test's runs are under
+(`TEVV-Distribution/`). A test's runs are under
 `generated/campaigns/<scenario>/runs/<run>/` (`bag/` for the first drone,
 `drones/<drone>/bag/` for each other, `validation.json`, `metrics/` with one
 `missions/<mission>.json` per mission), with its `campaign_manifest.json`
@@ -643,7 +632,7 @@ named after the scenario and the time the stack started, in **UTC**. The
 newest run is the last one listed:
 
 ```bash
-cd M-S-Simulation-Runtime-Stack
+cd TEVV-Distribution
 ls -t runs | head -1              # your latest run
 ```
 
@@ -681,7 +670,7 @@ You can also get it from the browser:
 | Service | Role |
 |---|---|
 | `unreal-airsim` | Unreal Engine 5.8 runtime host with Cosys-AirSim, loading your level pack. Publishes AirSim RPC on host port **41451**. |
-| `px4-drone-N` / `ardupilot-drone-N` | SITL autopilot, one per vehicle. |
+| `px4-drone-N` / `ardupilot-drone-N` | SITL autopilot, only for a drone whose stack flies on PX4 or ArduPilot; a SimpleFlight drone has none. |
 | `airsim_bridge_…` | ROS 2 Humble bridge: sensors and ground truth out, commands in. It also runs MAVROS if enabled. |
 | `foxglove_bridge_…` | Foxglove websocket for vehicle N on host port **8765 + N − 1**. |
 | `qgroundcontrol-x11` | QGroundControl, if enabled. |
@@ -772,45 +761,25 @@ above.
 **Visualisation.** Connect Foxglove or Lichtblick to `ws://localhost:8765`
 (vehicle 1).
 
-### Bringing your own container as a component
+### Bringing your own software: a stack
 
-To test your own estimator, perception node or planner, attach it to a stack as
-a component. (A TEVV-form package, `tevv.component.v1`, sees TEVV's fixed
-topics under its drone's namespace, `/tevv/<drone>/...`, and flies or rides
-on a drone through a stack, `stacks/<id>/stack.yaml`; the customer guide is
-TEVV-Interface's `docs/onboarding.md`.) You do not need to edit the stack's compose file, and you do not
-need to write adaptor code. Describe the container in one `components.json`,
-and the platform's generic adaptor fits it to the stack:
-- it republishes the stack's sensors under the names your container
-  subscribes to;
-- it turns your output into the platform's estimate;
-- it writes your config files from the stack's calibration.
+To test your own estimator, perception node or planner, write a stack:
+`stacks/<id>/interface.py`, one Python class on the TEVV SDK. Your software
+runs unchanged in your own images, listed in the class; the class says which
+autopilot the drone flies on and wires TEVV's topics
+(`/tevv/<drone>/...`) to yours. It is mounted, never built: edit and rerun.
 
 ```bash
-make stacks ARGS="component init my-vo --container myorg/my-vo:1.2"      # scaffold components/my-vo
-# fill in components/my-vo/components.json (its README.md lists the steps)
-make stacks ARGS="component check components/my-vo --stack generated/stereo-xfs"
-make stacks ARGS="generate scenarios/stereo-xfs --component components/my-vo --out $PWD/generated/stereo-xfs-my-vo"
+./tevv stack init my-vo --container myorg/my-vo:1.2   # writes stacks/my-vo/interface.py
+$EDITOR stacks/my-vo/interface.py
+./tevv stack check my-vo
+./tevv test init my-vo-box --scenario vio-baseline-box --drone Drone1=my-vo
+./tevv run my-vo-box
 ```
 
-`component check` prints what the adaptor will do with your file: each stack
-topic and the container topic it is relayed to, with the conversions, and
-every config value it will fill in. `components/dsta-mac-vo` is a worked
-example: MAC-VO run through the generic adaptor. `components/mac-vo` is the
-same estimator with a hand-written adaptor.
-
-The full walkthrough is MnS-Integration-Platform
-[`docs/guides/bring-your-own-container.md`](https://github.com/DinoHub/MnS-Integration-Platform/blob/feat/components/docs/guides/bring-your-own-container.md).
-It covers:
-- the fields;
-- the frame conventions;
-- pacing;
-- placeholders;
-- what to do when the generic adaptor is not enough.
-
-Under `make stacks`, `component init` runs without the Docker socket. It
-therefore cannot inspect your image, and it leaves the command for you to fill
-in.
+`stacks/super-planner`, `stacks/vio-openvins` and `stacks/vio-nav-stack` are
+worked examples. The full guide is [`docs/interface/`](interface/README.md):
+the SDK, every topic a drone offers, tests and results.
 
 ### Running stacks without the dashboard
 
@@ -853,30 +822,24 @@ campaign and swap in your own estimator.
 
 ### Test suites
 
-A test suite keeps a few tests together, each a scenario with its missions,
-their observers and a stated purpose, as one folder under `suites/`. Run
-every test in it with the stacks you choose, from the dashboard's **Test
-Suites** page (a stack picker per drone) or from the command line:
+A test suite is a list of tests, each with a stated purpose, in
+`suites/<id>/suite.yaml`. It runs from the command line, each test exactly
+as written (its scenario, its stacks, its runs):
 
 ```bash
-./tevv suite init my-suite --from scenarios/test-a scenarios/test-b   # one campaign per scenario
-$EDITOR suites/my-suite/suite.yaml                                    # each campaign's purpose
-./tevv suite check suites/my-suite
-./tevv suite run suites/my-suite --stack Drone1=<stack>   # repeatable; or --stack <stack> / --component for single-mission campaigns
-./tevv suite results my-suite
+./tevv suite list
+./tevv suite run suites/local-planner
+./tevv suite results local-planner
 ```
 
 Three example suites ship under `suites/`: `vio-estimator` (OpenVINS),
-`local-planner` (SUPER) and `vio-nav-stack` (OpenVINS feeding SUPER). A suite
-folder is self-contained: the Test Suites page exports it as a zip and imports
-one, so another install runs exactly the same tests. The customer guide is
-TEVV-Interface's `docs/suites.md`.
+`local-planner` (SUPER) and `vio-nav-stack` (OpenVINS feeding SUPER).
 
 ---
 
 ## 7. Where everything is stored
 
-Everything lives inside the folder you cloned, `M-S-Simulation-Runtime-Stack/`.
+Everything lives inside the folder you cloned, `TEVV-Distribution/`.
 
 **Your results**
 
@@ -1021,9 +984,7 @@ targets both use it, and each prints a note that it is an override.
   `(-927.2, -493.2, 128.2)` cm), and `make fly` / `make campaign` warn about a
   start at a floorless origin.
 - **Re-exporting a hand-written spec through ScenarioLab** replaces its
-  vehicle with the default DroneA at the PlayerStart, and for a PX4 spec
-  writes `autopilot.type: ardupilot` under the PX4 profile. Fix the runtime
-  block by hand after such an export (fixed in v1.1).
+  vehicle with the default DroneA at the PlayerStart.
 - **Office Environment** has a low ceiling. PX4 takeoffs there can be slow, and
   flights fly low.
 - **Bags are sqlite3 (`.db3`).** Convert with `ros2 bag convert` if you need
@@ -1043,15 +1004,16 @@ make author                     # ScenarioLab without the dashboard
 make fly SCENARIO=<name> RECORD=1     # fly one scenario headless, bag in runs/
 make campaign                   # the reference campaign, scored
 ./tevv stack list | show <id> | check <id>          # who can fly a drone
-./tevv run scenarios/<s> --stack Drone1=<stack> ... # fly a scenario's missions
-./tevv results <s>              # one row per run per mission
+./tevv test list | show <t>     # which stack flies which drone
+./tevv run <t>                  # fly a test (tests/<t>.yaml)
+./tevv results <t>              # one row per run per mission
 make doctor                     # every pinned image present?
 make topics STACK=generated/<name>    # what a stack publishes
 ls runs/                 # runs; bag in <run>/bag/
 make dashboard-down             # stop the dashboard
 ```
 
-**The flow:** Content → Author (Launch editor · Environment → Runtime →
-Vehicles → Sensor Profiles → Validate → **Export**) → **Generate stack** →
-ROS 2 (tick bag topics) → Metrics → **Launch** → Monitor (fly) → Launch
-**Stop** → `runs/<run>/bag/`
+**The flow:** Content → Author (Launch editor · Environment → Vehicles →
+Missions → Sensor Profiles → Validate → **Export**) → **Generate stack** →
+Observers → **Run** (a test, or the scenario on its own) → Monitor (watch) →
+verdict and bag in `generated/campaigns/<test>/runs/<run>/`
