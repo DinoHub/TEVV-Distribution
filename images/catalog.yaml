@@ -177,7 +177,7 @@ images:
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:64c102aeb1caad9555acc1baf2d0f0a4a6e8ba188aac521a65c0115b69012a5d
+    digest: sha256:b30f0395be8b4390d990f6d8c95b352ed99e9cebe2ce7818bacd938557976544
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -221,12 +221,14 @@ images:
       a stack needing the point cloud gets it in odom again, and AirSim's
       trace (a line every camera rendered) is off. Rebuilt from e99a2b4: a
       suite (tevv.suite.v3) lists scenarios and names no stack; suite run
-      --stack picks the stack under test.
+      --stack picks the stack under test. Rebuilt from a958431: the drone's
+      stack flies from take-off to landing (its interface), the mission's
+      supervisor only referees, observers take a phase.
 
   v1_interface:
     repo: dhdevspace/auto_mns
     tag: "tevv-interface-v1.1.0-dev"
-    digest: sha256:0949d4c970a1453f1fba0684f8484b68ebe3fcdf0421246dd3dc92306b694c70
+    digest: sha256:11a41eb74154cf1fe5a0e74f2828f935295ba1f1fb8bad6b5b79e26836c9002c
     channel: pinned
     source:
       repo: DinoHub/MnS-Integration-Platform
@@ -294,7 +296,7 @@ images:
   v1_dashboard_backend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-backend-v1.1.0-dev-bf6922a"
-    digest: sha256:a8a6e664a4ac271ebf89d67f77780984568866819db2325c6adca3c2c1d0c800
+    digest: sha256:b08aa30a2674a5d64165b37c4007dacae327a65330fe1e5c61ee582f18ba5f7e
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -337,7 +339,7 @@ images:
   v1_dashboard_frontend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-frontend-v1.1.0-dev-bf6922a"
-    digest: sha256:87b852f7ec0d583154fe8251c3d39cdc79809155d9354df087d50007fe1ce6ff
+    digest: sha256:435fa88d7865e052e64a610a30c87c4844402d9b4a8e4e40f1af95aca9bad8e2
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -353,7 +355,7 @@ images:
   metrics_service:
     repo: dhdevspace/auto_mns
     tag: "tevv-jsonl-ingest-v0.5.0-gcfe09f6"
-    digest: sha256:75e48d1ca51f4a2cd0c611cd75368fb15f6350f6369359ab969c3d51bd61bbbd
+    digest: sha256:d8bb6d98409e767fc0ea45cba2f5737862a991eaad3aa68dc525340aad76b44f
     channel: pinned
     source:
       repo: DinoHub/TEVV-Metrics
