@@ -3,9 +3,10 @@
 TEVV is a containerised simulation environment for testing drone autonomy.
 You author a scenario in ScenarioLab (an Unreal editor): the world, the drones
 and each drone's mission. You say who flies each drone with a stack (your
-software and a Python `interface.py` that wires it to TEVV's topics), TEVV
-generates and flies it (Unreal + Cosys-AirSim; SimpleFlight, PX4 or ArduPilot
-per drone; ROS 2 Humble), and judges each mission. Everything runs in Docker,
+software and a Python `interface.py` that wires it to TEVV's topics). TEVV
+generates and runs it (Unreal + Cosys-AirSim; SimpleFlight, PX4 or ArduPilot
+per drone; ROS 2 Humble); each stack flies its drone from take-off to
+landing, and TEVV judges each mission. Everything runs in Docker,
 from a terminal or a browser dashboard.
 
 This repository is the customer distribution (`DinoHub/TEVV-Distribution`;

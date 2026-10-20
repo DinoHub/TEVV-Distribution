@@ -17,14 +17,16 @@ you        ──► tests/<t>.yaml                     WHICH stack flies WHICH 
 
 | To | Read |
 | --- | --- |
-| bring your software: write a stack's `interface.py` | [stacks.md](stacks.md) |
+| bring your software: write a stack's `interface.py`; how a run goes, take-off to landing | [stacks.md](stacks.md) |
 | know every topic a drone offers and what you send back | [topics.md](topics.md) |
 | bind stacks to a scenario's drones, run, run a suite on your stack | [tests.md](tests.md) |
-| read the verdicts: observers, how a run is judged | [results.md](results.md) |
+| read the verdicts: observers (of the mission, take-off or landing), how a run is judged | [results.md](results.md) |
 
-TEVV ships no stack but its own, `tevv-default` (TEVV's follower flies the
-mission). `stacks/` and `tests/` are yours: git ignores them. [stacks.md](stacks.md)
-writes a planner and an estimator inline to copy from. The example suites
+TEVV ships no stack but its own: `tevv-default` (TEVV's follower flies the
+mission on SimpleFlight; `tevv-default-px4` and `tevv-default-ardupilot` on
+those autopilots). Whatever the stack, it flies its drone from take-off to
+landing; TEVV referees and judges. `stacks/` and `tests/` are yours: git
+ignores them. [stacks.md](stacks.md) writes a planner and an estimator inline to copy from. The example suites
 under [suites/](../../suites) (`local-planner`, `vio`, `stack`) name no stack:
 `./tevv suite run local-planner --stack my-planner` flies your planner on all
 of them.

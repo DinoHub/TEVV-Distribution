@@ -6,7 +6,8 @@ provides the observer types; you pick the ones you want, as many as you
 like, and give each an acceptance check. Each run is judged once, after the
 drones land, by TEVV's metrics service: every mission over its own **test
 segment** (its hand-over to its end), on its own drone's data only (see
-[topics.md](topics.md#the-lifecycle-of-a-run)).
+[topics.md](topics.md#the-lifecycle-of-a-run)). An observer can judge the
+stack's take-off or landing instead ([below](#take-off-and-landing)).
 
 ```yaml
 missions:
@@ -18,22 +19,57 @@ missions:
       - {id: short,     type: path_length,     check: {max: 60}}    # "pass if the path flown is under 60 m"
       - {id: accurate,  type: estimate_ate,    check: {max: 1.0}}
       - {id: rpe,       type: estimate_rpe}                          # no check: reported, not judged
+      - {id: clean-takeoff, type: collisions, phase: takeoff, check: {max: 0}}
 ```
 
 - `id`: yours; it is the observer's column in the results.
 - `type`: one of the types below.
 - `check`: one of `max` (at most), `min` (at least) or `eq` (equals), with
   your threshold. Leave it out to report the value without judging it.
+- `phase`: `takeoff`, `mission` (the default) or `landing`: what part of the
+  flight it judges.
 
 Add them in the dashboard (Observers step, per mission: the one thing the
-dashboard edits), or write them under each mission in the scenario's
-`ScenarioSpec.yaml`. ScenarioLab, which authors the missions, keeps them as
+dashboard edits; **Phase** picks the phase), or write them under each
+mission in the scenario's `ScenarioSpec.yaml`. ScenarioLab, which authors the missions, keeps them as
 they are.
 
 Before a run starts, TEVV refuses a mission whose **judged** observers its
 stack or drone cannot feed: an `estimate_*` observer on a stack that
 estimates nothing, `cloud_clearance` on a drone without a lidar. `./tevv
 interface <test>` shows the same problems ahead of time.
+
+## Take-off and landing
+
+The stack flies its own take-off and landing ([stacks.md](stacks.md#the-run)),
+so each mission records three segments, on ground truth:
+
+| Phase | From | To |
+| --- | --- | --- |
+| `takeoff` | `takeoff_start` | `in_position` (or `takeoff_failed`) |
+| `mission` | the hand-over (`control_handover`) | the mission's end (`run_end`), as before |
+| `landing` | `landing_start` | `landed` (or `land_timeout`) |
+
+An observer with `phase: takeoff` or `phase: landing` is computed over that
+segment only. Any type can judge take-off or landing except the goal-based
+ones, which judge the mission only: `goals_reached`, `time_to_goal`,
+`path_efficiency`, `response_time`, `navigation_error`, `command_rate` and
+`area_coverage`. The `estimate_*` observers and the other observers of what
+your stack publishes use that phase's window alone (`estimate_ate` fits its
+own alignment over it). For example:
+
+```yaml
+- {id: vio-init,      type: time_to_first_estimate, phase: takeoff}
+- {id: clean-takeoff, type: collisions,             phase: takeoff, check: {max: 0}}
+- {id: soft-landing,  type: jerk,                   phase: landing}
+```
+
+A phased observer keeps its own column (its id) in the results, and its
+result carries `phase`. A run with no such segment (a take-off that never
+started) skips it, with the reason. Each mission's
+`missions/<mission>.json` lists its `segments` (`takeoff`, `mission`,
+`landing`, each with its start, end and how it ended) and `landing` (how the
+landing ended). A `land_timeout` does not change the mission's verdict.
 
 ## How a run is judged
 
@@ -54,11 +90,13 @@ something.
 | `completed` | Every point reached, or `done` on `/tevv/<drone>/mission_status`. |
 | `timeout` | The mission's `timeout_s` ran out (counted from its hand-over). |
 | `stopped` | `./tevv stop <test>`, or an operator took the drone (changed its flight mode). |
+| `takeoff_failed` | The stack's take-off did not reach position within 240 s, or raised. The mission never started. |
+| `interface_error` | The stack's `interface.py` raised. |
 | `error` | The flight failed, or the drone's stack never became ready (TEVV did not hand over). The other missions fly on. |
 
 **The run** passes only if every mission passes. A run's `ended` is its
-worst mission's (`error`, then `stopped`, then `timeout`, then
-`completed`).
+worst mission's (`error`, then `interface_error`, `takeoff_failed`,
+`stopped`, `timeout`, then `completed`).
 
 An observer the run cannot measure (no geofence in the scenario, no estimate
 published) is **skipped** with the reason, and does not fail the run.
@@ -164,7 +202,7 @@ folder under `generated/campaigns/<test>/runs/<run>/` holds:
 | `drones/<drone>/bag/` | Each other drone's recording. |
 | `events.jsonl` | The simulator's event record. |
 | `validation.json` | The recording's quality gates. |
-| `metrics/<run>/missions/<mission>.json` | One per mission: how it ended, its segment, its hand-over, each point. |
+| `metrics/<run>/missions/<mission>.json` | One per mission: how it ended, its take-off, mission and landing segments, its hand-over, each point. |
 | `metrics/<run>/mission.json` | The run as a whole: every mission's summary, and one block spanning them all. |
 
 ## Recording valid, and viewed

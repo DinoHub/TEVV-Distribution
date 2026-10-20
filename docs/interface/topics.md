@@ -80,7 +80,7 @@ Four outputs, and nothing else leaves your stack's network.
 
 | Output | Type | SDK | What TEVV does with it |
 | --- | --- | --- | --- |
-| command | `mavros_msgs/msg/PositionTarget` | `command_from`, `send_*`, `follow_waypoints` | Flies it, while `control_state` is `external`. See [Commands](#commands). |
+| command | `mavros_msgs/msg/PositionTarget` | `command_from`, `send_*`, `follow_waypoints` | Passes it to the autopilot, while `control_state` is `external`. See [Commands](#commands). |
 | estimate | `nav_msgs/msg/Odometry` | `estimate_from`, `send_estimate` | Scores it against ground truth: the pose of `base_link` (FLU) in any fixed world frame of yours (TEVV aligns your world to `odom` before it scores). Stamp each estimate with the sim time of the measurement it was computed from. |
 | mission status | `std_msgs/msg/String` | `report_done`, `status_from` | `done` ends your drone's mission as `completed`. |
 | debug | any | `debug("name", msg)` | Recorded with the run on `/tevv/<d>/debug/<name>` and shown in Monitor; never acted on. |
@@ -99,12 +99,14 @@ takes, with its `type_mask`:
 - `coordinate_frame: 8` (`FRAME_BODY_NED`): body-frame velocities, passed as
   they are.
 
-TEVV owns the autopilot (PX4 or ArduPilot SITL, or SimpleFlight, as your stack
-chose). You never arm it, change its mode, or talk MAVLink: you send
-setpoints, TEVV flies them. On SimpleFlight TEVV turns each setpoint into a
-velocity command (a position is flown with a proportional term toward it). If your
-commands stop for more than **1 s**, TEVV holds the vehicle where it is
-until they resume.
+TEVV runs the autopilot (PX4 or ArduPilot SITL, or SimpleFlight, as your
+stack chose). Your containers never arm it, change its mode, or talk
+MAVLink: they send setpoints, and the interface passes them to the autopilot
+while the mission runs. Take-off and landing are `interface.py`'s steps,
+through `d.fc` ([stacks.md](stacks.md#the-run)). On SimpleFlight each
+setpoint becomes a velocity command (a position is flown with a proportional
+term toward it). If your commands stop for more than **1 s**, the drone holds
+where it is until they resume.
 
 ## The lifecycle of a run
 
@@ -120,18 +122,22 @@ drone its points in that drone's own `odom`.
 Before anything flies, TEVV starts the simulator and each drone's autopilot
 (the one its stack chose), then each drone's stack: its containers and its
 interface container, which runs `interface.py`'s `setup()`. Then every
-mission runs at the same time, each supervised by TEVV on its own:
+mission runs at the same time. The stack flies it, take-off and landing
+included; TEVV referees each on its own (it says the phase, publishes the
+mission and judges it on ground truth, and flies nothing):
 
-1. TEVV takes off and hovers over the drone's start
-   (`/tevv/<d>/control_state` is `tevv`).
+1. **Take-off** (`takeoff_start`): the stack's `takeoff(d)` step climbs to
+   the mission's start altitude (`/tevv/<d>/control_state` is `tevv`). It
+   ends at `in_position`; not within 240 s, the mission ends
+   `takeoff_failed`.
 2. TEVV waits for the stack's `ready` topics (and, for a stack that
    estimates, its first estimate). If they do not come within 240 s, the
    mission ends `error` without a hand-over and the drone lands. The other
    missions go on.
 3. **Segment start** (`control_handover`): TEVV publishes
    `/tevv/<d>/mission/waypoints` and the first `/tevv/<d>/mission/next`,
-   sets `/tevv/<d>/control_state` to `external`, and flies your
-   `/tevv/<d>/command`.
+   and sets `/tevv/<d>/control_state` to `external`; your
+   `/tevv/<d>/command` now reaches the autopilot.
 4. A point counts as reached when ground truth comes within the mission's
    **reach radius** (`reach_radius_m`, *Reach radius m* in ScenarioLab;
    default 1 m). TEVV then publishes the next point on `mission/next`.
@@ -141,12 +147,17 @@ mission runs at the same time, each supervised by TEVV on its own:
    stopped or an operator taking the drone (`stopped`), or `interface.py`
    raising (`interface_error`).
    `/tevv/<d>/control_state` goes back to `tevv` (`control_reclaimed`), and
-   TEVV lands the drone.
+   your command no longer reaches the autopilot.
+6. **Landing** (`landing_start`): the stack's `land(d)` step lands the
+   drone. It ends at `landed`; not within 60 s, `land_timeout` is recorded
+   and the verdict is unchanged.
 
 Each mission has its own **test segment**, from its hand-over to its end.
 Its observers are computed over that segment, on its own drone's data.
-Take-off and landing are outside it. The run ends when every mission has
-ended; TEVV then stops every stack and then its own side.
+Take-off and landing are segments of their own, judged only by observers
+with `phase: takeoff` or `phase: landing`
+([results.md](results.md#take-off-and-landing)). The run ends when every
+mission has ended; TEVV then stops every stack and then its own side.
 
 How a mission **ended** is separate from whether it **passed**, and the run
 passes only if every mission passes: see [results.md](results.md).
