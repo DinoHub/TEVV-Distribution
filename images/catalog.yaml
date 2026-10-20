@@ -177,7 +177,7 @@ images:
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:b30f0395be8b4390d990f6d8c95b352ed99e9cebe2ce7818bacd938557976544
+    digest: sha256:c73a2d0cedad9867ce235a36f5f91fa5036e74e6b3274ff31fd942a24f74aa98
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -223,7 +223,8 @@ images:
       suite (tevv.suite.v3) lists scenarios and names no stack; suite run
       --stack picks the stack under test. Rebuilt from a958431: the drone's
       stack flies from take-off to landing (its interface), the mission's
-      supervisor only referees, observers take a phase.
+      supervisor only referees, observers take a phase. Rebuilt from b0e721e: a vehicle
+      start without a frame is AirSim NED.
 
   v1_interface:
     repo: dhdevspace/auto_mns
