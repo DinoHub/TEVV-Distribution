@@ -42,7 +42,11 @@ super_planner:
   planning_horizon: 7.0
   sensing_horizon: -1
   receding_dis: 4.0
-  robot_r: 0.2
+  # 0.5 (was 0.2): the sim drone (AirSim Quadrotor1) is about 0.98 m rotor
+  # tip to rotor tip. At 0.2 SUPER planned paths that clipped the yard's
+  # containers (super-yard-detour, points at 3.5 m: 1 of 3, 15 contacts;
+  # at 0.5 with inflation_step 3: 3 of 3).
+  robot_r: 0.5
   yaw_dot_max: 3.0
   # Yaw mode: 1 heading to velocity, 2 heading to goal
   yaw_mode: 1
@@ -111,7 +115,8 @@ traj_opt:
 
 
 astar:
-  map_voxel_num: [ 1000, 1000, 300 ] # [ 500, 500, 100 ]
+  # [ 500, 500, 100 ] (was [ 1000, 1000, 300 ]): flown with robot_r 0.5
+  map_voxel_num: [ 500, 500, 100 ]
   visual_process: true # false
   allow_diag: true
   # 0 DIAG; 1 MANHATTAN; 2 EUCLIDEAN
@@ -125,7 +130,9 @@ rog_map:
   # 0.1 s), so SUPER never left the ground on the XFS course.
   resolution: 0.2 # change this
   inflation_resolution: 0.2
-  inflation_step: 2
+  # 3 (was 2): 0.6 m clearance, so the drone's 0.49 m half-width clears
+  # obstacles with robot_r 0.5.
+  inflation_step: 3
   unk_inflation_en: false
   unk_inflation_step: 1
   map_size: [ 50,50,15 ] # change this
