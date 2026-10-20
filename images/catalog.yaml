@@ -177,7 +177,7 @@ images:
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:5565e736990918822992ba60e0d11aeb043f5290cb726d34f3a00c51c7a8f63f
+    digest: sha256:64c102aeb1caad9555acc1baf2d0f0a4a6e8ba188aac521a65c0115b69012a5d
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -219,7 +219,9 @@ images:
       start yourself in your own network (Network(...)), test save and
       stack list --scenario for the dashboard's picker. Rebuilt from ba69d55:
       a stack needing the point cloud gets it in odom again, and AirSim's
-      trace (a line every camera rendered) is off.
+      trace (a line every camera rendered) is off. Rebuilt from e99a2b4: a
+      suite (tevv.suite.v3) lists scenarios and names no stack; suite run
+      --stack picks the stack under test.
 
   v1_interface:
     repo: dhdevspace/auto_mns
