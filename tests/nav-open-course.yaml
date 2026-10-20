@@ -1,6 +1,0 @@
-# Goal following in open space (three goals, nothing in the way)
-schema: tevv.test.v1
-scenario: nav-open-course
-drones:
-  Drone1: super-planner
-repeats: 2

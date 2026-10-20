@@ -1,4 +1,4 @@
-# Multi-drone test 2026-10-15: the super-planner package on both drones (two instances).
+# Multi-drone test 2026-10-15: one stack on both drones (a one-drone stack runs as two instances).
 schema: mns.scenario.v1
 environment:
   id: xfs-level

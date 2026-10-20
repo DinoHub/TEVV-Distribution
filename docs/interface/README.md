@@ -11,21 +11,23 @@ you        ──► stacks/<id>/interface.py           WHO flies, HOW   the aut
                                                                     containers, and the code that wires TEVV's
                                                                     topics to yours (Python, TEVV SDK)
 you        ──► tests/<t>.yaml                     WHICH stack flies WHICH drone, how many runs
-(optional) ──► suites/<id>/suite.yaml             a list of tests, each with its purpose
+(optional) ──► suites/<id>/suite.yaml             a kind of test: scenarios, each with its purpose; no stack,
+                                                                    you pick it when you run (--stack)
 ```
 
 | To | Read |
 | --- | --- |
 | bring your software: write a stack's `interface.py` | [stacks.md](stacks.md) |
 | know every topic a drone offers and what you send back | [topics.md](topics.md) |
-| bind stacks to a scenario's drones, run, group tests into suites | [tests.md](tests.md) |
+| bind stacks to a scenario's drones, run, run a suite on your stack | [tests.md](tests.md) |
 | read the verdicts: observers, how a run is judged | [results.md](results.md) |
 
-The worked examples are in [stacks/](../../stacks): `super-planner` (a
-planner flying on PX4), `vio-openvins` (an estimator while TEVV flies on
-SimpleFlight) and `vio-nav-stack` (an estimator feeding a planner that flies
-on the estimate). Their tests are in [tests/](../../tests), including
-`cross-demo`: two drones, two stacks, two autopilots in one scenario.
+TEVV ships no stack but its own, `tevv-default` (TEVV's follower flies the
+mission). `stacks/` and `tests/` are yours: git ignores them. [stacks.md](stacks.md)
+writes a planner and an estimator inline to copy from. The example suites
+under [suites/](../../suites) (`local-planner`, `vio`, `stack`) name no stack:
+`./tevv suite run local-planner --stack my-planner` flies your planner on all
+of them.
 
 ## Five minutes
 

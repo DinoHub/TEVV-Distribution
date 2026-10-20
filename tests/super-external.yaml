@@ -1,6 +1,0 @@
-# SUPER started by you in your own Docker network (stacks/super-planner-external/README.md).
-schema: tevv.test.v1
-scenario: nav-open-course
-drones:
-  Drone1: super-planner-external
-repeats: 1

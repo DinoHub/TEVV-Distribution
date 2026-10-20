@@ -10,7 +10,7 @@ stack_name: nav-container-weave
 # to goal is reported.
 #
 # Authored in ScenarioLab: the world, the drone and its mission. Who flies it
-# is the test's choice (tests/nav-container-weave.yaml), not the scenario's.
+# is chosen at run time (a suite's --stack, or your test), not the scenario's.
 
 environment:
   # XFS as packs/v1.0.0.lock.json pins it (same as vio-osmo-xfs-ardupilot).

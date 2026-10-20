@@ -9,7 +9,7 @@ stack_name: vio-long-loop
 # as a share of the distance, yaw drift and scale error.
 #
 # Authored in ScenarioLab: the world, the drone and its mission. Who flies it
-# is the test's choice (tests/vio-long-loop.yaml), not the scenario's.
+# is chosen at run time (a suite's --stack, or your test), not the scenario's.
 
 environment:
   id: xfs-level

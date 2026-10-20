@@ -8,7 +8,7 @@ stack_name: vio-baseline-box
 # well. Judged on accuracy (ATE) and on keeping an estimate up (availability).
 #
 # Authored in ScenarioLab: the world, the drone and its mission. Who flies it
-# is the test's choice (tests/vio-baseline-box.yaml), not the scenario's.
+# is chosen at run time (a suite's --stack, or your test), not the scenario's.
 
 environment:
   id: xfs-level

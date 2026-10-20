@@ -9,7 +9,7 @@ stack_name: vio-aggressive-zigzag
 # (availability), local drift (RPE) and the worst error.
 #
 # Authored in ScenarioLab: the world, the drone and its mission. Who flies it
-# is the test's choice (tests/vio-aggressive-zigzag.yaml), not the scenario's.
+# is chosen at run time (a suite's --stack, or your test), not the scenario's.
 
 environment:
   id: xfs-level

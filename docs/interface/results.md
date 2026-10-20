@@ -132,7 +132,8 @@ mission's reach radius (`reach_radius_m`).
 The number of runs is chosen when you run the test, not in the scenario:
 
 ```bash
-./tevv run tests/cross-demo.yaml --repeats 3
+./tevv run cross-demo --repeats 3                 # your test, tests/cross-demo.yaml
+./tevv suite run local-planner --stack my-planner --repeats 3
 ```
 
 The results table has one row per run per mission, so you see the spread.
@@ -192,18 +193,18 @@ Besides its verdict, each run says:
 [results] base-r1  east-west    Drone1  tevv-default  completed  PASS     3/3
 ```
 
-Two drones with two stacks (a test with `drones: {Drone1: vio-openvins,
-Drone2: super-planner}`): OpenVINS estimates while TEVV's follower flies
-`survey`, and SUPER flies `cross` through it. Each row is one mission,
-with the observers that mission lists:
+Two drones with two stacks (a test with `drones: {Drone1: my-vio, Drone2:
+my-planner}`, here OpenVINS and SUPER): OpenVINS estimates while TEVV's
+follower flies `survey`, and SUPER flies `cross` through it. Each row is one
+mission, with the observers that mission lists:
 
 ```console
-[results] run      mission  drone   stack          ended      verdict  goals  ...
-[results] base-r1  cross    Drone2  super-planner  completed  PASS     3/3    ...
-[results] base-r1  survey   Drone1  vio-openvins   completed  PASS     3/3    ...
+[results] run      mission  drone   stack       ended      verdict  goals  ...
+[results] base-r1  cross    Drone2  my-planner  completed  PASS     3/3    ...
+[results] base-r1  survey   Drone1  my-vio      completed  PASS     3/3    ...
 ```
 
-Earlier single-mission runs, from the worked examples: OpenVINS on the yard
+Earlier single-mission runs, with OpenVINS and SUPER as stacks: OpenVINS on the yard
 box reached an ATE of 0.20 m with 100 % availability; SUPER flew the yard
 square's three points with 1.78 m clearance in about 20 s.
 

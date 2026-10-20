@@ -9,7 +9,7 @@ stack_name: stack-open-course
 # Judged on navigation (goals, contact) and estimate accuracy together.
 #
 # Authored in ScenarioLab: the world, the drone and its mission. Who flies it
-# is the test's choice (tests/stack-open-course.yaml), not the scenario's.
+# is chosen at run time (a suite's --stack, or your test), not the scenario's.
 
 environment:
   id: xfs-level

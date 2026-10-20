@@ -9,43 +9,54 @@ stacks/<id>/
   requirements.txt    optional: Python packages interface.py imports
 ```
 
-TEVV ships three stacks: `tevv-default` (TEVV's waypoint follower on AirSim
-SimpleFlight), `tevv-default-px4` and `tevv-default-ardupilot` (the same
-follower on TEVV's PX4 or ArduPilot SITL). A folder of the same name in
-`stacks/` replaces a built-in.
+TEVV ships three stacks, built in: `tevv-default` (TEVV's waypoint follower
+on AirSim SimpleFlight), `tevv-default-px4` and `tevv-default-ardupilot` (the
+same follower on TEVV's PX4 or ArduPilot SITL). Every other stack is yours:
+`stacks/` is your folder (git ignores it), and a folder there named like a
+built-in replaces it.
 
 ```bash
-./tevv stack list                 # every stack, built-ins first
-./tevv stack show super-planner   # its declarations and its interface.py
-./tevv stack check super-planner  # can it fly a mission?
 ./tevv stack init my-planner --autopilot px4 --container me/planner:1   # a skeleton to edit
+./tevv stack list                 # every stack, built-ins first
+./tevv stack show my-planner      # its declarations and its interface.py
+./tevv stack check my-planner     # can it fly a mission?
 ```
 
 ## A whole example
 
-SUPER, a local planner, flying its drone's mission
-([stacks/super-planner](../../stacks/super-planner/interface.py)):
+Your local planner flying its drone's mission. Say it is SUPER, in your own
+image, with its config in `stacks/my-planner/files/config/planner.yaml`; this
+is the whole of `stacks/my-planner/interface.py`:
 
 ```python
 from tevv import Container, Interface
 
-class SuperPlanner(Interface):
+def velocity_command(msg):                           # your PositionTarget -> TEVV's command
+    from mavros_msgs.msg import PositionTarget as PT
+    out = PT(coordinate_frame=PT.FRAME_LOCAL_NED,    # MAVROS's name for its ENU frame
+             type_mask=PT.IGNORE_PX | PT.IGNORE_PY | PT.IGNORE_PZ | PT.IGNORE_AFX | PT.IGNORE_AFY
+                       | PT.IGNORE_AFZ | PT.IGNORE_YAW_RATE)
+    out.header.frame_id = "odom"
+    out.velocity, out.yaw = msg.velocity, msg.yaw
+    return out
+
+class MyPlanner(Interface):
     name = "SUPER local planner"
     autopilot = "px4"                                # what the drone flies on
     needs = ["ground_truth", "point_cloud"]          # what the drone must offer
     containers = {                                   # your software, unmodified
-        "super": Container(
-            image="dhdevspace/auto_mns:super_runtime-ms.1-cyclone",
-            command="... ros2 run super_planner fsm_node --ros-args "
-                    "-p config_name:=/stack/files/config/click.yaml"),
+        "planner": Container(
+            image="me/super-planner:1",
+            command="ros2 run super_planner fsm_node --ros-args "
+                    "-p config_name:=/stack/files/config/planner.yaml"),
     }
     ready = ["/planner_state"]                       # hand over once this is up
 
-    def setup(self):                                 # TEVV's topics <-> SUPER's
-        self.forward(self.gt_odom, "/px4vision_custom_0/mavros/local_position/odom")
-        self.forward(self.point_cloud, "/px4vision_custom_0/lidar")
+    def setup(self):                                 # TEVV's topics <-> your planner's
+        self.forward(self.gt_odom, "/odom")
+        self.forward(self.point_cloud, "/lidar")
         self.forward(self.next_waypoint, "/goal")
-        self.command_from("/px4vision_custom_0/mavros/setpoint_raw/local", convert=velocity_command)
+        self.command_from("/setpoint_raw/local", convert=velocity_command)
 ```
 
 ## How it runs
@@ -127,8 +138,11 @@ Every container gets:
 - `/stack` (read-only): your stack's folder (so `files/` is `/stack/files`);
 - `/shared` (read-write): a folder shared with `interface.py`, kept with the
   run (`outputs/components/<id>/shared/` in the run's stack folder): write a
-  config there that your software waits for (see
-  [vio-openvins](../../stacks/vio-openvins/interface.py));
+  config there that your software waits for (an estimator, for example,
+  whose container starts with
+  `until [ -f /shared/config.yaml ]; do sleep 1; done; exec ...`, and whose
+  `setup()` writes `self.shared / "config.yaml"` from
+  `self.stereo.left.calibration`);
 - CycloneDDS (`RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`) on your stack's own
   domain. Install `ros-humble-rmw-cyclonedds-cpp` in your images; do not set
   `ROS_DOMAIN_ID` or `CYCLONEDDS_URI`.
@@ -232,8 +246,7 @@ Every drone flies on the stack's autopilot. `/clock` reaches your side once;
 each drone's tf arrives as `/tevv/<drone>/tf` and `/tevv/<drone>/tf_static`
 (the drones' frame names are the same). `passthrough()` gives your side
 every drone's `/tevv/<drone>/...` names. An error in your code ends every
-drone's mission. `stacks/follow-many` is a worked example
-(`tests/follow-many.yaml`: three drones, one instance).
+drone's mission.
 
 ## A stack you start yourself
 
@@ -257,8 +270,18 @@ on your domain with plain multicast discovery, like any container on that
 network. Your domain must differ from the drones' (1, 2, ... by default).
 Start your stack before the run: a run whose network is missing stops
 before anything flies and says so. Your containers' logs stay with you;
-`./tevv logs` has the interface's. `stacks/super-planner-external` is a
-worked example, with the commands to start SUPER in `my-autonomy`.
+`./tevv logs` has the interface's. Starting yours might look like:
+
+```bash
+docker network create my-autonomy
+docker run -d --name my-planner --network my-autonomy \
+  -e ROS_DOMAIN_ID=0 -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  me/planner:1 ros2 launch my_planner planner.launch.py
+```
+
+Nothing restarts it between runs, so it keeps its state: restart it
+(`docker restart my-planner`) after a run that ended mid-flight. Stop it
+yourself afterwards (`docker rm -f my-planner`).
 
 ## What stays fixed
 

@@ -368,8 +368,8 @@ campaign: ensure-images  ## Fly a campaign (CAMPAIGN=<name>, or ARGS="<subcomman
 	@python3 tools/check_spawn.py campaign $(or $(ARGS),run $(CAMPAIGN)) || true
 	@$(MNS_STACKS_ENV); ./tools/mns-stacks.sh campaign $(or $(ARGS),run $(CAMPAIGN))
 
-suite: ensure-images  ## A test suite: make suite ARGS="run suites/<id>"
-	@test -n "$(ARGS)" || { echo 'usage: make suite ARGS="run suites/<id>"' >&2; exit 2; }
+suite: ensure-images  ## A test suite: make suite ARGS="run <id> --stack <stack>"
+	@test -n "$(ARGS)" || { echo 'usage: make suite ARGS="run <id> --stack <stack>"' >&2; exit 2; }
 	@mkdir -p generated suites
 	@$(MNS_STACKS_ENV); ./tools/mns-stacks.sh suite $(ARGS)
 
