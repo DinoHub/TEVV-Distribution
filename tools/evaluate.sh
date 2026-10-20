@@ -10,8 +10,8 @@
 #
 # MISSION is a command that flies the mission and returns when it is over;
 # {stack} in it is the generated stack's folder. Without one nobody flies and
-# the run is a fixed FLY_SECONDS (300) recording. COMPONENTS="components/x ..."
-# attaches component packages, as for `make fly`. The verdict is also in the
+# the run is a fixed FLY_SECONDS (300) recording. STACKS="Drone1=<stack> ..."
+# says who flies each drone, as for `make fly`. The verdict is also in the
 # dashboard's Analysis (Run metrics); `mns-stacks report --stack ...` prints it
 # again later.
 #

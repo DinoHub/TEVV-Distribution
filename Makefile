@@ -207,6 +207,8 @@ dashboard: stage-authoring-packs  ## TEVV Web Dashboard (browser entry point) on
 	check_ports 3001:$(DASHBOARD_CONTAINER_PREFIX)airsim-dashboard-frontend:frontend \
 	            8001:$(DASHBOARD_CONTAINER_PREFIX)airsim-dashboard-api:backend \
 	            $(or $(DASHBOARD_LICHTBLICK_PORT),8082):$(DASHBOARD_CONTAINER_PREFIX)dashboard-lichtblick:Lichtblick \
+	            $(or $(DASHBOARD_PIXEL_STREAMING_PORT),8080):$(DASHBOARD_CONTAINER_PREFIX)dashboard-pixel-streaming:"Sim view player" \
+	            8888:$(DASHBOARD_CONTAINER_PREFIX)dashboard-pixel-streaming:"Sim view streamers" \
 	            $(or $(FOXGLOVE_BRIDGE_PORT),8764):$(DASHBOARD_CONTAINER_PREFIX)ros2-tools:"Foxglove websocket" || exit 1
 	@. ./tools/compose_retry.sh; . ./tools/load-images-env.sh; \
 	$(LOAD_DASHBOARD_IMAGES); \
@@ -324,7 +326,7 @@ ifeq ($(strip $(SCENARIO)),)
 $(error usage: make fly SCENARIO=<name under scenarios/> [RECORD=1] [KEEP=1] [ARGS=...])
 endif
 endif
-fly: ensure-demo-packs  ## Generate and fly SCENARIO for FLY_SECONDS unless ARGS names --done (RECORD=1 records a bag; COMPONENTS="openvins components/x ..." attaches packages, by id or folder)
+fly: ensure-demo-packs  ## Generate and fly SCENARIO for FLY_SECONDS unless ARGS names --done (RECORD=1 records a bag; STACKS="Drone1=<stack> ..." says who flies each drone)
 	@$(MNS_STACKS_ENV); COMPONENTS="$(COMPONENTS)" ./tools/fly.sh "$(SCENARIO)" $(if $(filter 1 true yes,$(RECORD)),--record,) $(if $(filter 1 true yes,$(KEEP)),--keep,) -- $(ARGS)
 
 evaluate: ensure-demo-packs  ## Fly SCENARIO end to end and print its verdict: record what scorers read, MISSION="<cmd>" ({stack} = the stack), score, report (COMPONENTS= as for fly)
@@ -365,6 +367,11 @@ campaign: ensure-images  ## Fly a campaign (CAMPAIGN=<name>, or ARGS="<subcomman
 	@# floor (packs/level-spawn-hints.json), before hours of runs fail to arm.
 	@python3 tools/check_spawn.py campaign $(or $(ARGS),run $(CAMPAIGN)) || true
 	@$(MNS_STACKS_ENV); ./tools/mns-stacks.sh campaign $(or $(ARGS),run $(CAMPAIGN))
+
+suite: ensure-images  ## A test suite: make suite ARGS="run <id> --stack <stack>"
+	@test -n "$(ARGS)" || { echo 'usage: make suite ARGS="run <id> --stack <stack>"' >&2; exit 2; }
+	@mkdir -p generated suites
+	@$(MNS_STACKS_ENV); ./tools/mns-stacks.sh suite $(ARGS)
 
 campaign-status:  ## One row per flight of a campaign (CAMPAIGN=<name>)
 	@$(MNS_STACKS_ENV); ./tools/mns-stacks.sh campaign status $(CAMPAIGN)

@@ -1,0 +1,15 @@
+# A TEVV test suite (tevv.suite.v3), an example to copy: a kind of test, as scenarios run in
+# order. It names no stack: ./tevv suite run <id> --stack <your stack> flies every drone of
+# every scenario on it (tevv-default without --stack).
+schema: tevv.suite.v3
+name: Navigation stack
+description: 'A whole stack that estimates its own pose and flies on it: the local planner suite''s open course and
+  detour, judged on navigation and on the estimate the stack navigated with. TEVV takes off and hands over; the stack
+  under test flies from the stereo pair, the IMU and the registered point cloud.'
+scenarios:
+- scenario: stack-open-course
+  purpose: Reaching three open goals on its own estimate
+  repeats: 2
+- scenario: stack-detour
+  purpose: Finding a way round a container row on its own estimate
+  repeats: 2
