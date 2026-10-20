@@ -11,7 +11,9 @@ stacks/<id>/
 
 TEVV ships three stacks, built in: `tevv-default` (TEVV's waypoint follower
 on AirSim SimpleFlight), `tevv-default-px4` and `tevv-default-ardupilot` (the
-same follower on TEVV's PX4 or ArduPilot SITL). Every other stack is yours:
+same follower on TEVV's PX4 or ArduPilot SITL). All three are the same
+`TevvDefault` class with the default take-off and landing; only the autopilot
+differs. Every other stack is yours:
 `stacks/` is your folder (git ignores it), and a folder there named like a
 built-in replaces it.
 
@@ -50,7 +52,7 @@ class MyPlanner(Interface):
             command="ros2 run super_planner fsm_node --ros-args "
                     "-p config_name:=/stack/files/config/planner.yaml"),
     }
-    ready = ["/planner_state"]                       # hand over once this is up
+    ready = ["/planner_state"]                       # the mission starts once this is up
 
     def setup(self):                                 # TEVV's topics <-> your planner's
         self.forward(self.gt_odom, "/odom")
@@ -93,13 +95,13 @@ refused with the line that has it.
 | `autopilot` | `"simpleflight"` | `"simpleflight"`, `"px4"` or `"ardupilot"`, or `Autopilot(...)` (below). |
 | `needs` | `[]` (`["ground_truth"]` for `TevvDefault`) | What the drone must offer: `ground_truth`, `imu`, `gnss`, `lidar`, `point_cloud`, `camera_primary`, `camera:<name>`, `stereo_primary`, `stereo:<name>`. A run refuses a drone that lacks one, naming what it has. |
 | `containers` | `{}` | `name: Container(...)`, started before `setup()` runs. |
-| `ready` | `[]` | Topics on your side that TEVV waits for, after take-off, before it hands the drone over (up to 240 s). |
+| `ready` | `[]` | Topics on your side that TEVV waits for, after take-off, before the mission starts (up to 240 s). |
 | `drones` | `"one"` | `"one"`: an instance flies one drone (a test naming it for two drones runs it twice). `"many"`: one instance flies every drone a test gives it ([below](#one-stack-many-drones)). |
 | `network` | `None` | `Network("<docker network>", domain=<ROS_DOMAIN_ID>)`: a stack you start yourself, in your own Docker network; declare no `containers` ([below](#a-stack-you-start-yourself)). |
 
 ### Choosing an autopilot
 
-| `autopilot =` | What TEVV starts for the drone | How TEVV takes off, holds and lands |
+| `autopilot =` | What TEVV starts for the drone | How `d.fc` ([The run](#the-run)) and your command reach it |
 | --- | --- | --- |
 | `"simpleflight"` | nothing: AirSim's built-in controller | the bridge's AirSim API (velocity commands) |
 | `"px4"` | TEVV's pinned PX4 SITL, and MAVROS in the drone's bridge | MAVROS, OFFBOARD |
@@ -116,6 +118,7 @@ autopilot = Autopilot("px4", image="me/px4-custom:1")             # your own SIT
 `params` go to that drone's SITL (ArduPilot). `image` replaces TEVV's SITL
 image for that drone; it must keep TEVV's SITL contract, and `stack check`
 warns that results are then not comparable with TEVV's pinned autopilot.
+`d.fc` and the default take-off and landing work on it unchanged.
 
 One scenario can mix autopilots per drone, with one exception: PX4 and
 ArduPilot cannot fly together (AirSim has one clock: ArduPilot needs it
@@ -207,7 +210,7 @@ your estimator beside it, subclass `TevvDefault`:
 ```python
 from tevv import Container, TevvDefault
 
-class MyVio(TevvDefault):                 # TEVV flies on SimpleFlight
+class MyVio(TevvDefault):                 # TEVV's follower flies, on SimpleFlight
     needs = ["ground_truth", "stereo_primary", "imu"]
     containers = {"vio": Container(image="me/vio:1")}
 
@@ -217,6 +220,82 @@ class MyVio(TevvDefault):                 # TEVV flies on SimpleFlight
         self.forward(self.imu, "/imu0")
         self.estimate_from("/vio/odom")
 ```
+
+## The run
+
+Your stack flies its drone's whole mission, take-off and landing included.
+TEVV only referees: it tells your interface each phase (`takeoff`, `start`,
+`end`), publishes the mission, judges it on ground truth and logs every
+event. It never flies the drone. Per drone:
+
+1. **Take-off.** TEVV calls your `takeoff(d)` step. When it returns, the
+   interface reports the drone in position. Budget: 240 s, including the
+   autopilot's own wait before it will arm (PX4's estimator can take a
+   minute or two). Over it, or if the step raises, the mission ends
+   `takeoff_failed`; TEVV never takes the drone over.
+2. **Ready.** TEVV waits for your `ready` topics (up to 240 s), else the
+   mission ends `error`.
+3. **Mission.** TEVV publishes the points, `control_state` turns
+   `external`, and `on_start(d)` is called. Your commands now reach the
+   autopilot through the interface's gate; after 1 s without one, the drone
+   holds.
+4. **End.** At the first of: every point reached, `done`, an error, the
+   time budget, a stop. The gate closes and `on_end(d, reason)` is called.
+5. **Landing.** TEVV calls your `land(d)` step; when it returns, the drone
+   has landed. Budget: 60 s. Over it, `land_timeout` is recorded; the
+   mission's verdict does not change. A stopped run does not land.
+
+Steps fly; notifications only tell. Override any of them:
+
+| Method | Kind | Default |
+| --- | --- | --- |
+| `takeoff(d)` | step: return when the drone is in position | `d.fc.takeoff(d.takeoff_altitude)` |
+| `on_start(d)` | notification: the mission started, you have control | nothing |
+| `on_end(d, reason)` | notification: the mission ended (`completed`, `timeout`, `stopped`, `error`, ...) | nothing |
+| `land(d)` | step: return once landed | `d.fc.land()` |
+
+`d` is `self` for a one-drone stack, and each `Drone` handle for
+`drones = "many"`. Each runs on its own thread, so a step may block. Each
+phase is scored by its own observers ([results.md](results.md#take-off-and-landing)).
+
+`d.fc` is the drone's flight controller, on the autopilot your stack
+declares: MAVROS for TEVV's PX4 and ArduPilot SITLs, the bridge's AirSim API
+for SimpleFlight. Positions are in `odom`.
+
+| Call | What |
+| --- | --- |
+| `position()` | Where the drone is (ground truth): `(x, y, z)`. |
+| `arm()`, `disarm()` | Arm or disarm (SimpleFlight does both in its take-off and landing). |
+| `mode(name)` | Set a flight mode (`"OFFBOARD"`, `"GUIDED"`, ...; not on SimpleFlight). |
+| `takeoff(z)` | Arm, climb to height `z` and hold. Returns when there. |
+| `goto(x, y, z, yaw=None)` | Fly to a point, holding `yaw` if given. Returns at once. |
+| `hold()` | Hold where the drone is. |
+| `land()` | Land where the drone is. Returns at touchdown. |
+
+`d.takeoff_altitude` is the `odom` height TEVV asks the take-off to reach:
+the mission's start altitude above the ground the drone stands on. A call the
+autopilot refuses raises, and the step fails.
+
+Your own take-off, say a first stop at 1 m, then the climb facing north:
+
+```python
+import time
+from tevv import Interface
+
+class MyPlanner(Interface):
+    autopilot = "px4"
+    ...
+    def takeoff(self, d):
+        x, y, z = d.fc.position()
+        d.fc.takeoff(z + 1.0)                            # arm, climb to 1 m, hold
+        d.fc.goto(x, y, d.takeoff_altitude, yaw=1.5708)  # facing north (ENU)
+        while abs(d.fc.position()[2] - d.takeoff_altitude) > 0.3:
+            time.sleep(0.1)
+```
+
+Your containers cannot fly the take-off: your command reaches the autopilot
+only during the mission. Your own SITL image (`Autopilot("px4",
+image=...)`, [above](#choosing-an-autopilot)) gets the same `d.fc`.
 
 ## One stack, many drones
 
@@ -286,11 +365,13 @@ yourself afterwards (`docker rm -f my-planner`).
 ## What stays fixed
 
 Your stack cannot publish on the drone's side except through the four
-outputs (`command`, `estimate`, `mission_status`, `debug/*`), cannot fly
-outside the hand-over (TEVV only passes your command while
+outputs (`command`, `estimate`, `mission_status`, `debug/*`), cannot command
+the drone outside the mission (the interface passes your command only while
 `control_state` is `external`, and holds the drone after 1 s without one),
-and cannot change the mission or its observers. That is what makes a TEVV
-result comparable between stacks.
+and cannot change the mission or its observers. Only `interface.py`'s steps
+touch the autopilot, through `d.fc`; your containers never see MAVROS. TEVV
+judges every phase on ground truth. That is what makes a TEVV result
+comparable between stacks.
 
 ## Editing and debugging
 
@@ -311,9 +392,10 @@ result comparable between stacks.
   simulator and your containers stay up), and TEVV's follower carries on from
   the point TEVV says is next. A restart mid-flight spoils that run's scores;
   it is for iterating.
-- **Errors.** An exception in `setup()` or a callback ends the mission
-  `interface_error`, with the reason in the results and the traceback in the
-  log. The other drones fly on.
+- **Errors.** An exception in `setup()`, a step or a callback ends the
+  mission `interface_error` (`takeoff_failed` during take-off), with the
+  reason in the results and the traceback in the log. The other drones fly
+  on.
 - **Python packages.** `requirements.txt` is installed into the interface
   container when it starts.
 - **Your editor.** `./tevv sdk` copies the SDK (the version TEVV runs) into

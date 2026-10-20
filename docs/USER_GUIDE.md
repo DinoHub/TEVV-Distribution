@@ -470,7 +470,9 @@ shown here read-only. This step picks what each mission is judged on: its
 **observers**, from TEVV's catalog (collisions, goals reached, clearance,
 estimate accuracy and more), each with a check (*at most*, *at least*,
 *equal to* a value) or none (reported only). With several missions, pick
-the mission at the top first. **Save observers** writes them into the
+the mission at the top first. **Phase** picks what an observer judges: the
+mission (the default), or the stack's take-off or landing (not the
+goal-based types). **Save observers** writes them into the
 scenario's `ScenarioSpec.yaml` and regenerates the stack. A mission passes
 when every observer with a check passes; a run passes only when every
 mission does. Who flies each drone is set by a test file (Step 2).
@@ -494,9 +496,11 @@ repeats: 1
 A stack is a folder, `stacks/<id>/interface.py`: one Python class that says
 which autopilot the drone flies on (SimpleFlight, PX4 or ArduPilot), the
 sensors it needs, the containers to start, and the code wiring TEVV's topics
-to yours. `tevv-default` (TEVV's follower on SimpleFlight) is built in, and
-is the only stack TEVV ships: `stacks/` and `tests/` are yours, and git
-ignores them. A stack can fly several drones as one instance (`drones = "many"`), or be one
+to yours, including its own take-off and landing if it wants them (the
+default uses the autopilot's). `tevv-default` (TEVV's follower on
+SimpleFlight; `tevv-default-px4` and `tevv-default-ardupilot` on those
+autopilots) is built in, and is the only stack TEVV ships: `stacks/` and
+`tests/` are yours, and git ignores them. A stack can fly several drones as one instance (`drones = "many"`), or be one
 you start yourself in your own Docker network (`network = Network(...)`).
 See [`docs/interface/`](interface/README.md).
 
@@ -506,10 +510,11 @@ mission, the stack that flies it, with its autopilot and who flies.
 A stack the drone cannot fly (it lacks a sensor the stack needs) is
 disabled, with the reason; PX4 and ArduPilot together are refused.
 **Save test** writes `tests/<id>.yaml`; **Run** saves first when you changed
-a pick. Leave **Runs** empty to fly the test's own count. Every mission flies at the same time: TEVV takes
-each drone off, hands it to its stack, publishes the points, takes it back
-and lands it. A stack that never becomes ready ends its mission `error`
-without stopping the others. The same from a terminal:
+a pick. Leave **Runs** empty to fly the test's own count. Every mission flies at the same time.
+Each drone's stack flies it from take-off to landing; TEVV only referees:
+it says the phase (take-off, mission, landing), publishes the points, judges
+on ground truth and logs every event. A stack that never becomes ready ends
+its mission `error` without stopping the others. The same from a terminal:
 
 ```bash
 ./tevv stack list                                    # who can fly a drone
