@@ -36,9 +36,9 @@ cd tevv
 Then fly a test from a terminal, or from the dashboard:
 
 ```bash
-./tevv test list                      # the example tests: which stack flies which drone
-./tevv run tests/vio-baseline-box.yaml
+./tevv run scenarios/vio-baseline-box             # TEVV's built-in stack (tevv-default) flies it
 ./tevv results vio-baseline-box
+./tevv suite run local-planner --stack my-planner # a kind of test, flown by your stack
 ```
 
 To test your own software, write a stack: [docs/interface/](docs/interface/README.md).

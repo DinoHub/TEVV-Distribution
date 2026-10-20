@@ -9,7 +9,7 @@ stack_name: nav-detour
 # what it sensed; path length is reported.
 #
 # Authored in ScenarioLab: the world, the drone and its mission. Who flies it
-# is the test's choice (tests/nav-detour.yaml), not the scenario's.
+# is chosen at run time (a suite's --stack, or your test), not the scenario's.
 
 environment:
   # XFS as packs/v1.0.0.lock.json pins it (same as vio-osmo-xfs-ardupilot).

@@ -12,7 +12,7 @@ stack_name: openvins-yard-zigzag
 # pair as stereo_primary: front (left) and front_right, 0.12 m baseline,
 # 640x480, FOV 80 (fx = fy = 381.36), same-stamp captures.
 #
-#   ./tevv test init openvins-yard-zigzag --scenario openvins-yard-zigzag --drone Drone1=vio-openvins
+#   ./tevv test init openvins-yard-zigzag --scenario openvins-yard-zigzag --drone Drone1=<your stack>
 #   ./tevv run openvins-yard-zigzag
 
 environment:

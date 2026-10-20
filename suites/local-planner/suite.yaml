@@ -1,14 +1,18 @@
-# A TEVV test suite (tevv.suite.v2), an example to copy: a list of tests (tests/<id>.yaml),
-# run in order, each as written (its scenario, which stack flies each drone, how many runs).
-schema: tevv.suite.v2
-name: Local planner suite
+# A TEVV test suite (tevv.suite.v3), an example to copy: a kind of test, as scenarios run in
+# order. It names no stack: ./tevv suite run <id> --stack <your stack> flies every drone of
+# every scenario on it (tevv-default without --stack).
+schema: tevv.suite.v3
+name: Local planner
 description: 'How well a local planner reaches goals in the container yard: goal following in open space, finding
-  a way round an obstacle row, and keeping its distance in clutter. TEVV takes off and hands over; the stack flies
-  every course on ground truth and the registered point cloud.'
-tests:
-- test: nav-open-course
+  a way round an obstacle row, and keeping its distance in clutter. TEVV takes off and hands over; the stack under
+  test flies every course on ground truth and the registered point cloud.'
+scenarios:
+- scenario: nav-open-course
   purpose: Goal following in open space (three goals, nothing in the way)
-- test: nav-detour
+  repeats: 2
+- scenario: nav-detour
   purpose: Finding a way round a 30 m container row to a goal behind it
-- test: nav-container-weave
+  repeats: 2
+- scenario: nav-container-weave
   purpose: Weaving between containers to every goal, keeping clear and flying smoothly
+  repeats: 2

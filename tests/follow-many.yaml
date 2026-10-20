@@ -1,8 +1,0 @@
-# Three drones, one stack instance: follow-many flies them all (drones = "many").
-schema: tevv.test.v1
-scenario: multi-cross-three
-drones:
-  Drone1: follow-many
-  Drone2: follow-many
-  Drone3: follow-many
-repeats: 1

@@ -486,16 +486,17 @@ how many runs. The Run step writes it for you (below), or edit it by hand:
 schema: tevv.test.v1
 scenario: multi-cross-two
 drones:                       # a drone with a mission that is not listed flies tevv-default
-  Drone1: vio-openvins
-  Drone2: super-planner
+  Drone1: my-vio
+  Drone2: my-planner
 repeats: 1
 ```
 
 A stack is a folder, `stacks/<id>/interface.py`: one Python class that says
 which autopilot the drone flies on (SimpleFlight, PX4 or ArduPilot), the
 sensors it needs, the containers to start, and the code wiring TEVV's topics
-to yours. `tevv-default` (TEVV's follower on SimpleFlight) is built in. A
-stack can fly several drones as one instance (`drones = "many"`), or be one
+to yours. `tevv-default` (TEVV's follower on SimpleFlight) is built in, and
+is the only stack TEVV ships: `stacks/` and `tests/` are yours, and git
+ignores them. A stack can fly several drones as one instance (`drones = "many"`), or be one
 you start yourself in your own Docker network (`network = Network(...)`).
 See [`docs/interface/`](interface/README.md).
 
@@ -512,7 +513,7 @@ without stopping the others. The same from a terminal:
 
 ```bash
 ./tevv stack list                                    # who can fly a drone
-./tevv test save my-test --scenario <s> --drone Drone1=vio-openvins
+./tevv test save my-test --scenario <s> --drone Drone1=my-vio
 ./tevv interface my-test                             # what each drone offers its stack
 ./tevv run my-test
 ./tevv logs my-test                                  # your interface's prints and errors
@@ -631,7 +632,7 @@ Everything a run produces is inside the folder you cloned
 `drones/<drone>/bag/` for each other, `validation.json`, `metrics/` with one
 `missions/<mission>.json` per mission), with its `campaign_manifest.json`
 beside them; a suite's runs
-are under `generated/suites/<suite>/<run>/campaigns/<campaign>/`. A stack
+are under `generated/suites/<suite>/<run>/scenarios/<scenario>/`. A stack
 flown by hand gets its own folder in `runs/`,
 named after the scenario and the time the stack started, in **UTC**. The
 newest run is the last one listed:
@@ -782,9 +783,9 @@ $EDITOR stacks/my-vo/interface.py
 ./tevv run my-vo-box
 ```
 
-`stacks/super-planner`, `stacks/vio-openvins` and `stacks/vio-nav-stack` are
-worked examples. The full guide is [`docs/interface/`](interface/README.md):
-the SDK, every topic a drone offers, tests and results.
+TEVV ships no example stack to copy; the full guide,
+[`docs/interface/`](interface/README.md), writes a planner and an estimator
+inline, and covers the SDK, every topic a drone offers, tests and results.
 
 ### Running stacks without the dashboard
 
@@ -827,18 +828,23 @@ campaign and swap in your own estimator.
 
 ### Test suites
 
-A test suite is a list of tests, each with a stated purpose, in
-`suites/<id>/suite.yaml`. It runs from the command line, each test exactly
-as written (its scenario, its stacks, its runs):
+A test suite is a kind of test, such as a local planner's or an estimator's:
+a list of scenarios, each with a stated purpose, in `suites/<id>/suite.yaml`.
+It names no stack: you choose the stack under test when you run it, and it
+flies every drone of every scenario. It runs from the command line:
 
 ```bash
 ./tevv suite list
-./tevv suite run suites/local-planner
+./tevv suite check local-planner --stack my-planner   # can it fly every scenario?
+./tevv suite run local-planner --stack my-planner     # tevv-default without --stack
 ./tevv suite results local-planner
+./tevv suite runs local-planner                       # every run, with its stack
 ```
 
-Three example suites ship under `suites/`: `vio-estimator` (OpenVINS),
-`local-planner` (SUPER) and `vio-nav-stack` (OpenVINS feeding SUPER).
+Three example suites ship under `suites/`: `local-planner` (goal following
+and detours in the container yard), `vio` (an estimator riding along TEVV's
+flight) and `stack` (a stack that flies on its own estimate). See
+[`docs/interface/tests.md`](interface/tests.md).
 
 ---
 
@@ -1011,6 +1017,7 @@ make campaign                   # the reference campaign, scored
 ./tevv stack list | show <id> | check <id>          # who can fly a drone
 ./tevv test list | show <t>     # which stack flies which drone
 ./tevv run <t>                  # fly a test (tests/<t>.yaml)
+./tevv suite run <id> --stack <s>     # a suite's scenarios, flown by your stack
 ./tevv results <t>              # one row per run per mission
 make doctor                     # every pinned image present?
 make topics STACK=generated/<name>    # what a stack publishes

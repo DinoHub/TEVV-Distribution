@@ -5,7 +5,7 @@ stack_name: super-yard-square
 
 # An ArduCopter over the XFS container yard with a 3D GPU lidar: the world a
 # local planner is tested in. Like stereo-xfs for estimators, it names no
-# planner. A test binds one to the drone (stacks/super-planner, for example)
+# planner. A test binds one to the drone (your stack in stacks/<id>/)
 # and it flies the mission's goal course (missions, below).
 #
 # Sim truth is the planner's odometry (/ground_truth/odom); the bridge's

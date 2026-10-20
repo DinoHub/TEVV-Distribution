@@ -22,6 +22,11 @@ generated/
 /.mns/
 /runs/
 /generated/
+# Your stacks and your tests are yours: TEVV ships none (tevv-default, the
+# stack that flies every drone a test leaves out, is built in). Suites name
+# no stack, so they stay.
+/stacks/
+/tests/
 /scenarios/*
 # The reference campaign is a whole directory:
 # the spec, the campaign over it, the route it flies and the estimator

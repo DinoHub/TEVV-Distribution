@@ -1,7 +1,0 @@
-# Which stack flies which drone of the scenario (drones it leaves out: tevv-default).
-schema: tevv.test.v1
-scenario: multi-cross-two
-drones:
-  Drone1: vio-openvins      # TEVV's follower flies on SimpleFlight; OpenVINS estimates
-  Drone2: super-planner     # SUPER flies on PX4
-repeats: 1

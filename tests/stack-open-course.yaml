@@ -1,6 +1,0 @@
-# Reaching three open goals on its own estimate
-schema: tevv.test.v1
-scenario: stack-open-course
-drones:
-  Drone1: vio-nav-stack
-repeats: 2
