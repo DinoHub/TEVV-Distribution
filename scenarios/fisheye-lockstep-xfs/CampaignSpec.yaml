@@ -1,0 +1,54 @@
+# Sim-time lockstep acceptance (ADR 0004): the same route three times.
+#   free-stall      lockstep forced off (r.Fisheye.Lockstep 0) with a 200 ms render
+#                   stall every 30 bursts: capture_grid must FAIL (missing slots).
+#   lockstep-stall  the same stall under lockstep: capture_grid must PASS.
+#   lockstep        no stall: PASS, and its real-time factor is the price.
+# The stall withholds captures for 200 ms of wall time (r.Fisheye.DebugStallMs);
+# it does not sleep the game thread. camera_info only is recorded: capture_grid
+# checks its stamps (the images carry the same ones), so a run is MBs, not GBs.
+# The route pilot flies on sim time (the contract promises a grid), so the route
+# takes its 72 s in sim time; timeout_s is wall time, with room for rtf ~0.45.
+# Note: free-running shared-cube capture on this host can hit an NVIDIA Xid 109
+# within a minute (also without lockstep code); if free-stall dies of it, the
+# capture_grid failure is still the expected result for that variant.
+schema: mns.campaign.v1
+id: fisheye-lockstep-xfs
+name: 'Sim-time lockstep under a render stall: free-running vs lockstep'
+scenario: ./ScenarioSpec.yaml
+mission:
+  source: external
+  autopilot: ardupilot
+  trajectory: ./routes/yard-box.yaml
+  done: timeout
+  timeout_s: 900
+variants:
+- id: free-stall
+  name: Lockstep forced off; 200 ms render stall every 30 bursts
+  overrides:
+    conditions:
+      render:
+        system_settings:
+          r.Fisheye.Lockstep: 0
+          r.Fisheye.DebugStallMs: 200
+          r.Fisheye.DebugStallEvery: 30
+- id: lockstep-stall
+  name: Lockstep; 200 ms render stall every 30 bursts
+  overrides:
+    conditions:
+      render:
+        system_settings:
+          r.Fisheye.DebugStallMs: 200
+          r.Fisheye.DebugStallEvery: 30
+- id: lockstep
+  name: Lockstep, no stall
+repeats: 1
+recording:
+  keep: all
+  topics:
+  - /clock
+  - /ground_truth/odom
+  - /imu/data
+  - /fisheye_front/camera_info
+  - /fisheye_right/camera_info
+  - /fisheye_back/camera_info
+  - /fisheye_left/camera_info
