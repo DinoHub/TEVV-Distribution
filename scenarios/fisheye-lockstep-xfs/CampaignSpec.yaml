@@ -7,7 +7,10 @@
 # it does not sleep the game thread. camera_info only is recorded: capture_grid
 # checks its stamps (the images carry the same ones), so a run is MBs, not GBs.
 # The route pilot flies on sim time (the contract promises a grid), so the route
-# takes its 72 s in sim time; timeout_s is wall time, with room for rtf ~0.45.
+# takes its 77 s in sim time. done: mission ends the run when the pilot returns
+# (landed); timeout_s caps the pilot in wall time, with room for rtf ~0.45 and
+# the readiness gate. (done: timeout would read timeout_s as a recording tail
+# AFTER the landing.)
 # Note: free-running shared-cube capture on this host can hit an NVIDIA Xid 109
 # within a minute (also without lockstep code); if free-stall dies of it, the
 # capture_grid failure is still the expected result for that variant.
@@ -19,7 +22,7 @@ mission:
   source: external
   autopilot: ardupilot
   trajectory: ./routes/yard-box.yaml
-  done: timeout
+  done: mission
   timeout_s: 900
 variants:
 - id: free-stall
