@@ -1,0 +1,49 @@
+# OpenVINS monocular on the front SHM fisheye, as a sim-time lockstep participant
+# (ADR 0004 step 2, MnS-Integration-Platform docs/adr/0004-...). The stereo
+# OpenVINS component reads its pair over RPC, which lockstep does not cover; the
+# fisheye is published under lockstep today.
+#
+# The image carries frame-status.patch: ov_msckf/frame_status gets one
+# std_msgs/Header per camera frame (processed | skipped), which the bridge's
+# lockstep_relay acknowledges to the simulator, so physics waits for OpenVINS
+# before moving past each capture. track_frequency is 60 so the gate never
+# drops a frame of the 30 Hz grid (33 or 36 ms apart).
+schema: mns.component.v1
+id: openvins-mono-fisheye
+name: OpenVINS mono VIO, front fisheye, lockstep participant
+version: 0.1.0
+kind: estimator
+
+images:
+  openvins: dhdevspace/auto_mns:vio-estimator-openvins-69488123-lockstep.1
+
+consumes: ["camera:fisheye_front", imu, clock]
+produces:
+  estimate: {topic: /ov_msckf/odomimu}
+  record: [/ov_msckf/frame_status]
+ready: {topics: [/ov_msckf/trackhist], timeout_s: 180}
+
+lockstep:
+  participant: openvins
+  status_topic: /ov_msckf/frame_status
+  timeout_ms: 2000
+
+scoring:
+  builtin: estimate
+  checks:
+    ate_rmse_m: {max: 2.0}
+    availability: {min: 0.9}
+
+requires:
+  autopilot: [ardupilot]
+
+files:
+  config: config
+
+services:
+  ov_msckf:
+    role: component
+    image: openvins
+    command: [ros2, launch, ov_msckf, subscribe.launch.py,
+              "config_path:=/cfg/component/config/estimator_config.yaml",
+              "use_stereo:=false", "max_cameras:=1"]
