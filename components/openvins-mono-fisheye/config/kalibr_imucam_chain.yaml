@@ -1,0 +1,21 @@
+%YAML:1.0
+# The front SHM fisheye of fisheye-lockstep-xfs: 512 x 512, 190 deg, an ideal
+# equidistant (Kannala-Brandt) lens, f = 256 / (95 deg in rad) = 154.4 px, no
+# distortion -- what the bridge publishes as camera_info (kannala_brandt, D = 0).
+# Shared cubemap: the optical centre is the rig anchor, the vehicle origin
+# (FisheyeSharedCubemapOffset 0), so the translation to the IMU is zero.
+# Optical frame z forward, x right, y down; IMU/body FLU.
+cam0:
+  T_imu_cam:
+    - [0.0, 0.0, 1.0, 0.0]
+    - [-1.0, 0.0, 0.0, 0.0]
+    - [0.0, -1.0, 0.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: []
+  camera_model: pinhole
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+  distortion_model: equidistant
+  intrinsics: [154.397, 154.397, 255.5, 255.5]
+  resolution: [512, 512]
+  rostopic: /fisheye_front/image_raw
+  timeshift_cam_imu: 0.0

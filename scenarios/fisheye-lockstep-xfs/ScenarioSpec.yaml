@@ -1,0 +1,135 @@
+# Sim-time lockstep acceptance (ADR 0004 in MnS-Integration-Platform,
+# docs/adr/0004-simulation-time-holds-for-camera-captures.md).
+#
+# fisheye-surround-shm's world, vehicle, route and autopilot with its four
+# 190-degree fisheyes on one shared cubemap, a 30 Hz synchronized burst and
+# fisheye_lockstep: the simulator holds physics at each slot of a 30 Hz
+# sim-time grid until all four images are published. ArduPilot follows the
+# held clock (its AirSim backend advances by our timestamp deltas). The stack
+# contract states each camera's grid, and the recording validator checks it
+# (capture_grid[<camera>]): no missing slot, every stamp within one 3 ms
+# physics step of its slot.
+#
+# Render settings: CardCapturesPerFrame 16 and LensRainWeatherScale 0 as in
+# fisheye-surround-shm (see its comments: Lumen card cost per capture, the XFS
+# phantom lens rain); SharedCubeMultiRig renders the shared rig's faces in one
+# scene renderer and MaxReadbacksInFlight 3, as the swarm plans run.
+# Needs a runtime host with the lockstep arbiter (TEVV-Airsim
+# feat/v1.1-sim-time-lockstep, #235). Compose only (SHM needs ipc: host).
+#
+schema: mns.scenario.v1
+id: fisheye-lockstep-xfs
+name: XFS, ArduPilot, 4x190-deg fisheye on SHM, sim-time lockstep at 30 Hz
+stack_name: fisheye-lockstep-xfs
+environment:
+  id: xfs-level
+  version: 1.0.2
+  artifact_digest: sha256:7eeb41a5ad04d3d2f4bd8c5d876703793b7485d93d59d07172d12c174c100871
+conditions:
+  render:
+    system_settings:
+      r.LumenScene.SurfaceCache.CardCapturesPerFrame: 16
+      r.Fisheye.LensRainWeatherScale: 0
+      r.Fisheye.SharedCubeMultiRig: 1
+      r.Fisheye.MaxReadbacksInFlight: 3
+runtime:
+  profile: airsim_unreal_ardupilot_docker
+  features:
+    sim_real_eval: true
+    ros2_bridge: true
+    qgroundcontrol: false
+    mavros: true
+    foxglove_bridge: false
+vehicles:
+- id: drone_1
+  name: Drone1
+  runtime_name: Drone1
+  ros_domain_id: 1
+  start:
+    x: 423
+    y: -906
+    z: -21.0
+  cameras:
+    fisheye_front:
+      position:
+        x: 0
+        y: 0
+        z: -0.15
+      rotation:
+        roll: 0
+        pitch: 0
+        yaw: 0
+      capture_settings:
+      - image_type: 0
+        width: 512
+        height: 512
+        fov_degrees: 190
+        fisheye_lens_type: Circular
+        fisheye_shared_cubemap: true
+        fisheye_sync_capture_fps: 30
+        fisheye_lockstep: true
+    fisheye_right:
+      position:
+        x: 0
+        y: 0
+        z: -0.15
+      rotation:
+        roll: 0
+        pitch: 0
+        yaw: 90
+      capture_settings:
+      - image_type: 0
+        width: 512
+        height: 512
+        fov_degrees: 190
+        fisheye_lens_type: Circular
+        fisheye_shared_cubemap: true
+        fisheye_sync_capture_fps: 30
+        fisheye_lockstep: true
+    fisheye_back:
+      position:
+        x: 0
+        y: 0
+        z: -0.15
+      rotation:
+        roll: 0
+        pitch: 0
+        yaw: 180
+      capture_settings:
+      - image_type: 0
+        width: 512
+        height: 512
+        fov_degrees: 190
+        fisheye_lens_type: Circular
+        fisheye_shared_cubemap: true
+        fisheye_sync_capture_fps: 30
+        fisheye_lockstep: true
+    fisheye_left:
+      position:
+        x: 0
+        y: 0
+        z: -0.15
+      rotation:
+        roll: 0
+        pitch: 0
+        yaw: 270
+      capture_settings:
+      - image_type: 0
+        width: 512
+        height: 512
+        fov_degrees: 190
+        fisheye_lens_type: Circular
+        fisheye_shared_cubemap: true
+        fisheye_sync_capture_fps: 30
+        fisheye_lockstep: true
+  sensors:
+    imu:
+      generate_noise: true
+      angular_random_walk: 0.5833
+      velocity_random_walk: 0.2039
+      gyro_bias_stability: 0.0
+      accel_bias_stability: 0.0
+    gps: true
+    barometer: true
+    magnetometer: true
+    gpu_lidar: false

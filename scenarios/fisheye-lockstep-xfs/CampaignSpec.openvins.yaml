@@ -1,0 +1,52 @@
+# Sim-time lockstep, step 2 acceptance (ADR 0004): OpenVINS (mono, front fisheye)
+# as a lockstep participant. The simulator holds each capture until OpenVINS has
+# processed it (ov_msckf/frame_status -> the bridge's lockstep_relay -> the sim),
+# so its input -- every image, every IMU sample -- is the same however slowly the
+# machine renders.
+#   lockstep        no stall: the baseline score.
+#   lockstep-load   a 100 ms render stall every 3 bursts, a heavily loaded GPU:
+#                   must score within run-to-run noise of `lockstep`.
+#   free-load       the same stall without lockstep: what a loaded GPU does today.
+# The pilot flies on sim time (the contract promises a grid); done: mission ends at
+# the landing; timeout_s caps the pilot in wall time (lockstep-load runs slowly).
+schema: mns.campaign.v1
+id: fisheye-lockstep-openvins
+name: 'OpenVINS mono fisheye under sim-time lockstep: idle vs loaded GPU'
+scenario: ./ScenarioSpec.yaml
+extensions:
+  mns.components:
+    - ../../components/openvins-mono-fisheye
+mission:
+  source: external
+  autopilot: ardupilot
+  trajectory: ./routes/yard-box.yaml
+  done: mission
+  timeout_s: 1800
+variants:
+- id: lockstep
+  name: Lockstep, no stall
+- id: lockstep-load
+  name: Lockstep; 100 ms render stall every 3 bursts
+  overrides:
+    conditions:
+      render:
+        system_settings:
+          r.Fisheye.DebugStallMs: 100
+          r.Fisheye.DebugStallEvery: 3
+- id: free-load
+  name: Lockstep forced off; the same stall
+  overrides:
+    conditions:
+      render:
+        system_settings:
+          r.Fisheye.Lockstep: 0
+          r.Fisheye.DebugStallMs: 100
+          r.Fisheye.DebugStallEvery: 3
+repeats: 1
+recording:
+  keep: all
+  topics:
+  - /clock
+  - /ground_truth/odom
+  - /imu/data
+  - /fisheye_front/camera_info
