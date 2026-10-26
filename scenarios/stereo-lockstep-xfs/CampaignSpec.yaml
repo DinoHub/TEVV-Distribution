@@ -42,7 +42,7 @@ variants:
           r.Fisheye.Lockstep: 0
           r.Fisheye.DebugStallMs: 100
           r.Fisheye.DebugStallEvery: 3
-repeats: 1
+repeats: 3
 recording:
   keep: all
   topics:
