@@ -3,6 +3,8 @@
 # OpenVINS calibration-campaign-v1 was frozen on), with both cameras on the pinhole SHM
 # path through the fisheye render arbiter: a 30 Hz sim-time grid and fisheye_lockstep.
 # No estimator here; OpenVINS attaches as a component (components/openvins-stereo-lockstep).
+# No exposure_compensation: on the pinhole SHM path it switches auto exposure off, and
+# vio-osmo's -11 EV (meant for the RPC camera) leaves the image black (max pixel 10).
 # Compose only (SHM needs ipc: host).
 schema: mns.scenario.v1
 id: stereo-lockstep-xfs
@@ -40,7 +42,6 @@ vehicles:
         width: 640
         height: 480
         fov_degrees: 80
-        exposure_compensation: -11.0
         pinhole_shm_publish_enabled: true
         fisheye_sync_capture_fps: 30
         fisheye_lockstep: true
@@ -54,7 +55,6 @@ vehicles:
         width: 640
         height: 480
         fov_degrees: 80
-        exposure_compensation: -11.0
         pinhole_shm_publish_enabled: true
         fisheye_sync_capture_fps: 30
         fisheye_lockstep: true
