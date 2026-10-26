@@ -20,6 +20,11 @@ mission:
   source: external
   autopilot: ardupilot
   trajectory: ./routes/yard-box.yaml
+  # ArduPilot flies the route as a mission, started by RC input scheduled at a sim
+  # time, so no wall-clock command reaches the flight controller and two lockstep
+  # runs fly the same. 60 s leaves the EKF time to converge.
+  fly_as: ardupilot_mission
+  start_at_sim_s: 60
   done: mission
   timeout_s: 1800
 variants:
