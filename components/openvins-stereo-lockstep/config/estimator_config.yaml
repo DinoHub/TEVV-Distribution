@@ -92,7 +92,7 @@ grid_x: 5 # extraction sub-grid count for horizontal direction (uniform tracking
 grid_y: 5 # extraction sub-grid count for vertical direction (uniform tracking)
 min_px_dist: 10 # distance between features (features near each other provide less information)
 knn_ratio: 0.70 # descriptor knn threshold for the top two descriptor matches
-track_frequency: 60.0 # the lockstep grid is 30 Hz with 33 or 36 ms intervals, and a 30 Hz gate would drop the 33 ms frames
+track_frequency: 60.0 # above the lockstep grid (10 Hz, 99 or 102 ms intervals) so the rate gate never drops a grid frame
 downsample_cameras: false # will downsample image in half if true
 num_opencv_threads: 4 # -1: auto, 0-1: serial, >1: number of threads
 histogram_method: "HISTOGRAM" # NONE, HISTOGRAM, CLAHE

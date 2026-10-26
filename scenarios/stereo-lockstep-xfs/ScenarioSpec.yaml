@@ -1,7 +1,10 @@
 # Sim-time lockstep with a stereo pair (ADR 0004, steps 1-2): vio-osmo-xfs-ardupilot's
 # world, vehicle, IMU and stereo rig (640x480, FOV 80, 0.12 m baseline -- the rig the
 # OpenVINS calibration-campaign-v1 was frozen on), with both cameras on the pinhole SHM
-# path through the fisheye render arbiter: a 30 Hz sim-time grid and fisheye_lockstep.
+# path through the fisheye render arbiter: a 10 Hz sim-time grid and fisheye_lockstep.
+# 10 Hz, not 30: OpenVINS keeps 11 clones, so at 30 Hz its window spans 0.37 s and the
+# scale goes (lockstep runs 6.5 m and 18.8 m ATE, scale 0.51 and 0.18), while ~10 Hz
+# (1.1 s) is the regime calibration-campaign-v1 was tuned in (free run 0.64 m).
 # No estimator here; OpenVINS attaches as a component (components/openvins-stereo-lockstep).
 # No exposure_compensation: on the pinhole SHM path it switches auto exposure off, and
 # vio-osmo's -11 EV (meant for the RPC camera) leaves the image black (max pixel 10).
@@ -43,7 +46,7 @@ vehicles:
         height: 480
         fov_degrees: 80
         pinhole_shm_publish_enabled: true
-        fisheye_sync_capture_fps: 30
+        fisheye_sync_capture_fps: 10
         fisheye_lockstep: true
     front_right:
       position:
@@ -56,7 +59,7 @@ vehicles:
         height: 480
         fov_degrees: 80
         pinhole_shm_publish_enabled: true
-        fisheye_sync_capture_fps: 30
+        fisheye_sync_capture_fps: 10
         fisheye_lockstep: true
   sensors:
     imu:
