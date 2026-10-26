@@ -1,0 +1,36 @@
+# MIGHTY on the yard slalom with and without sim-time lockstep.
+#   lockstep   the sim holds each 10 Hz slot until MIGHTY has replanned (its
+#              point_A) or 1 s has passed, so a slow replan costs wall time, not
+#              flight time.
+#   free       lockstep forced off: the sim runs on while MIGHTY replans, as today.
+# Both run MIGHTY on sim time (components/mighty-lockstep). The pilot counts goal
+# timeouts in sim seconds when the stack runs lockstep.
+schema: mns.campaign.v1
+id: mighty-lockstep-slalom
+name: 'MIGHTY slalom: lockstep vs free'
+scenario: ./ScenarioSpec.yaml
+extensions:
+  mns.components:
+    - ../../components/mighty-lockstep
+mission:
+  source: external
+  autopilot: ardupilot
+  goals: ./courses/yard-slalom.yaml
+  # The pilot command blocks until the course is flown and the drone has landed;
+  # the run then records 10 s more.
+  done: timeout
+  timeout_s: 10
+variants:
+- id: lockstep
+  name: Lockstep, SUPER a participant
+- id: free
+  name: Lockstep forced off
+  overrides:
+    conditions:
+      render:
+        system_settings:
+          r.Fisheye.Lockstep: 0
+repeats: 2
+recording:
+  # The planner's scored topics (the registered cloud is most of it, ~10 GB a run).
+  keep: all

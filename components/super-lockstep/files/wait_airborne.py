@@ -4,7 +4,9 @@
 SUPER's state machine streams position targets from the moment it starts
 (mav_pos_cmd_pub_en), and in ArduPilot GUIDED those override the pilot's
 take-off, so the vehicle never climbs. The pilot takes off first; this gate
-holds SUPER's launch until sim truth is MIN_CLIMB_M above where it started
+holds SUPER's launch until sim truth is MIN_CLIMB_M above the lowest point it
+has seen (the ground: under sim-time lockstep the first sample can be the
+vehicle at its spawn point, in the air before it drops)
 and nearly still.
 """
 import math
@@ -30,12 +32,13 @@ def main() -> int:
     state = {"z0": None, "msg": None}
 
     def on_odom(msg: Odometry) -> None:
-        if state["z0"] is None:
-            state["z0"] = msg.pose.pose.position.z
+        z = msg.pose.pose.position.z
+        if state["z0"] is None or z < state["z0"]:
+            state["z0"] = z
         state["msg"] = msg
 
     node.create_subscription(Odometry, TOPIC, on_odom, qos_profile_sensor_data)
-    print(f"[gate] waiting for {TOPIC}: {MIN_CLIMB_M} m above the start, slower than {MAX_SPEED} m/s "
+    print(f"[gate] waiting for {TOPIC}: {MIN_CLIMB_M} m above the lowest point seen, slower than {MAX_SPEED} m/s "
           f"for {STILL_S} s", flush=True)
     start, still_since = time.time(), None
     while time.time() - start < TIMEOUT_S:
