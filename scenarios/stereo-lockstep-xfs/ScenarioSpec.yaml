@@ -30,6 +30,12 @@ vehicles:
   name: Drone1
   runtime_name: Drone1
   ros_domain_id: 1
+  # The campaign flies its route as an ArduPilot mission (mission.fly_as:
+  # ardupilot_mission): mode switch high is AUTO, arming and takeoff in AUTO need
+  # no throttle, and the mission's CONDITION_YAW holds between waypoints. Set at
+  # boot: the bridge's MAVROS runs without its parameter plugin.
+  autopilot_params:
+    ardupilot: {FLTMODE6: 3, AUTO_OPTIONS: 3, WP_YAW_BEHAVIOR: 0}
   start:
     x: 423
     y: -906
