@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=../_schema/components.schema.json
+# super-lockstep: the SUPER local planner on simulation time, as a sim-time lockstep participant.
+# The simulation holds each lockstep slot until SUPER's /planner_state has turned
+# over since: that timer shares SUPER's exclusive callback group with the replan,
+# so it goes quiet exactly while a replan blocks, and the sim waits for the plan
+# instead of the drone flying the old one. files/sim_time.launch.py runs the
+# adaptor launch with use_sim_time, so trajectories are sampled on /clock.
+# Check it with: mns-stacks component check components/super-lockstep
+
+schema: mns.component.v1
+id: super-lockstep
+name: SUPER local planner (sim time, lockstep participant)
+version: 0.1.0
+kind: planner
+container:
+  image: dhdevspace/auto_mns:super_runtime-ms.1
+  command:
+  - bash
+  - -lc
+  - set +u && source /opt/ros/humble/setup.bash && python3 /cfg/component/files/wait_airborne.py && source
+    /workspace/generated/super_planner/.planner_ws/ros_ws/install/setup.sh && source /workspace/generated/super_planner/adaptor_ws/install/setup.sh
+    && export AMENT_PREFIX_PATH=/workspace/generated/super_planner/adaptor_ws/install/super_planner_adaptor:/workspace/generated/super_planner/adaptor_ws/install:$AMENT_PREFIX_PATH
+    && export PYTHONPATH=/workspace/generated/super_planner/adaptor_ws/install/super_planner_adaptor/lib/python3.10/site-packages:/workspace/generated/super_planner/adaptor_ws/src/super_planner_adaptor:$PYTHONPATH
+    && export PATH=/workspace/generated/super_planner/adaptor_ws/install/super_planner_adaptor/lib/super_planner_adaptor:$PATH
+    && exec ros2 launch /cfg/component/files/sim_time.launch.py use_planner:=true runtime_params_file:=/cfg/component/files/config/click.yaml
+    use_rviz:=false autopilot:=ardupilot vehicle_output_topic:=/$MNS_VEHICLE/mavros/setpoint_raw/local
+  gpu: false
+  run_as: image
+  environment: {}
+consumes:
+- point_cloud
+- ground_truth
+- clock
+- autopilot
+produces:
+  path:
+    topic: /planner_result
+requires:
+  autopilot:
+  - ardupilot
+  point_cloud_frame: odom
+  bridge_mavros: true
+scoring:
+  builtin: planner
+  options:
+    tolerance_m: 1.0
+    plan_topic: /planner_result
+  checks:
+    goal_success_rate:
+      min: 1.0
+    min_clearance_m:
+      min: 0.3
+    replan_interval_max_s:
+      max: 2.0
+adaptor:
+  inputs:
+  - role: point_cloud
+    topic: /Copter1/registered_point_cloud
+  outputs: []
+  config: []
+ready:
+  after_takeoff:
+  - /planner_state
+  timeout_s: 180
+record:
+- /Drone1/mavros/setpoint_raw/local
+- /planner_state
+- /planner_result
+lockstep:
+  participant: super
+  ack_on: /planner_state
+  timeout_ms: 10000

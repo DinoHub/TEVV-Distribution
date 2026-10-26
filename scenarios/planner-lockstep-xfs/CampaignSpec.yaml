@@ -1,0 +1,36 @@
+# SUPER on the yard slalom with and without sim-time lockstep.
+#   lockstep   the sim holds each 10 Hz slot until SUPER's main loop has turned over
+#              (its /planner_state goes quiet while a replan blocks), so a slow
+#              replan costs wall time, not flight time.
+#   free       lockstep forced off: the sim runs on while SUPER replans, as today.
+# Both run SUPER on sim time (components/super-lockstep). The pilot counts goal
+# timeouts in sim seconds when the stack runs lockstep.
+schema: mns.campaign.v1
+id: super-lockstep-slalom
+name: 'SUPER slalom: lockstep vs free'
+scenario: ./ScenarioSpec.yaml
+extensions:
+  mns.components:
+    - ../../components/super-lockstep
+mission:
+  source: external
+  autopilot: ardupilot
+  goals: ./courses/yard-slalom.yaml
+  # The pilot command blocks until the course is flown and the drone has landed;
+  # the run then records 10 s more.
+  done: timeout
+  timeout_s: 10
+variants:
+- id: lockstep
+  name: Lockstep, SUPER a participant
+- id: free
+  name: Lockstep forced off
+  overrides:
+    conditions:
+      render:
+        system_settings:
+          r.Fisheye.Lockstep: 0
+repeats: 2
+recording:
+  # The planner's scored topics (the registered cloud is most of it, ~10 GB a run).
+  keep: all
