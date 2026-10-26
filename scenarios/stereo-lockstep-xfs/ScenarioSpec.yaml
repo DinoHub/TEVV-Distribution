@@ -71,5 +71,9 @@ vehicles:
     gpu_lidar: false
 conditions:
   render:
+    # Draw the main viewport, small: under NoDisplay a Lumen pinhole capture leaks
+    # (the renderer's per-frame distance-field bookkeeping only runs for a drawn view).
+    draw_viewport: true
+    viewport_resolution: [320, 240]
     system_settings:
       r.Fisheye.MaxReadbacksInFlight: 3
