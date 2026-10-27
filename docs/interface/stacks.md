@@ -518,23 +518,30 @@ of writing `interface.py` by hand. Each step records what it did, so you can
 stop and come back.
 
 ```bash
-./tevv stack prepare-image my-stack --dockerfile-dir ~/my-software     # or --image me/software:1
-./tevv stack discover my-stack --image me/software:1-tevv-cyclone      # what its ROS graph publishes and reads
+./tevv stack prepare-image my-stack --dockerfile-dir ~/my-software
+./tevv stack discover my-stack --image tevv-local/my-software:latest-tevv-cyclone   # its ROS graph
 ./tevv stack rig my-stack --kalibr-camchain camchain-imucam.yaml --kalibr-imu imu.yaml
-./tevv stack wire my-stack --autopilot px4                             # writes interface.py
-./tevv stack lock my-stack                                             # pins the images
+./tevv stack wire my-stack --autopilot px4                                           # writes interface.py
+./tevv stack lock my-stack                                                           # pins the images
 ```
 
 1. **prepare-image** builds your Dockerfile folder (`--dockerfile-dir DIR`) or
    takes a published image (`--image IMAGE`), and adds Cyclone DDS when the
-   image lacks it, as `<repo>:<tag>-tevv-cyclone`. `--tag TAG` names what is
-   built. Give it the stack id to record the image for that stack; without
-   an id it only builds.
-2. **discover** starts the image, waits for its ROS graph to settle
-   (`--timeout S`, default 60), and lists each node with the topics it
-   subscribes to and publishes, with their types. `--command CMD` says what
-   starts your software when the image's own command is not it. The stack's
-   folder is made when it is missing.
+   image lacks it, as `<repo>:<tag>-tevv-cyclone`. A Dockerfile folder is
+   built as `tevv-local/<folder name>:latest` (`--tag TAG` names another
+   tag), so `~/my-software` above becomes `tevv-local/my-software:latest`,
+   and `tevv-local/my-software:latest-tevv-cyclone` once Cyclone is added.
+   It prints the image it made: that is the one to discover. Give it the
+   stack id to record the image for that stack; without an id it only
+   builds.
+2. **discover** starts the image (`--image IMAGE`, required: the image
+   prepare-image printed), waits for its ROS graph to settle (`--timeout S`,
+   default 60), and lists each node with the topics it subscribes to and
+   publishes, with their types. `--command CMD` says what starts your
+   software when the image's own command is not it. The stack's folder is
+   made when it is missing. When the discovery did not settle or its
+   container exited, or the image differs from the one prepared, `wire`
+   still writes `interface.py` but warns you to discover again.
 3. **rig** describes the sensors your drone carries (below).
 4. **wire** matches the discovered topics to what the rig gives the drone,
    and writes `stacks/<id>/interface.py`: one `forward`, `command_from` or
@@ -546,7 +553,11 @@ stop and come back.
 5. **lock** is [Pinning a stack](#pinning-a-stack).
 
 Your software keeps its own topic names; `interface.py` is the only place
-that knows both sides.
+that knows both sides. Onboarding takes an id of your own: `discover`, `rig`
+and `wire` refuse the built-in stacks' ids (`tevv-default`,
+`tevv-default-px4`, `tevv-default-ardupilot`). Writing a rig or
+`interface.py` clears the stack's live check, since what was checked has
+changed.
 
 ### What the stack folder gains
 
@@ -561,10 +572,12 @@ stacks/<id>/
 
 `onboarding.json` holds the discovery (when it ran, the nodes and topics),
 the wiring written into `interface.py`, the image prepared for the stack,
-every replacement (`stack replace`) and the live check. Edit `rig/rig.yaml`
-by hand if you need to; run `stack rig` again to refit it. It holds no
+every replacement (`stack replace`) and the live check. It holds no
 registry logins: TEVV reaches registries only through your own Docker
-configuration.
+configuration. Edit `rig/rig.yaml` by hand if you need to: it is checked
+again the next time it is read (`stack rig --show`, `stack wire`, a run),
+and an error there names the field to fix. Run `stack rig` again to refit
+it.
 
 ### The rig
 
@@ -579,13 +592,14 @@ configuration.
 The source is Kalibr's `camchain-imucam.yaml` (`--kalibr-camchain FILE`) and
 optionally its `imu.yaml` (`--kalibr-imu FILE`, for the noise and update
 rate), or known sensor models (`--model ID`, a camera, IMU or lidar,
-repeatable) instead of Kalibr files.
+repeatable) instead of Kalibr files. One drone renders at most four cameras
+at the rate a rig asks for, so a rig with more is refused at this step.
 
 | Flag | What |
 | --- | --- |
-| `--camera-names A,B` | One name per Kalibr camera, in `cam0`, `cam1` order (default `cam0`, `cam1`, ...). |
+| `--camera-names A,B` | One name per Kalibr camera, in `cam0`, `cam1` order (default `cam0`, `cam1`, ...). A name is a letter, then letters, digits or underscores. |
 | `--topic CAMERA=TOPIC` | The topic your software reads that camera on; `imu=TOPIC` for the IMU. Repeatable. It wins over a guess by name when `wire` matches topics. |
-| `--rate CAMERA=HZ` | A camera's rate. Kalibr does not record one, so a camera runs at 30 Hz unless you say so. Repeatable. |
+| `--rate CAMERA=HZ` | The rate the camera is forwarded to your software at (`wire` writes it as `max_hz` on that camera's `forward`, and the fit report shows it). Kalibr does not record one, so a camera runs at 30 Hz unless you say so. The live check confirms the rate the simulator actually delivers. Repeatable. |
 | `--imu-mount ROLL,PITCH,YAW` | Where the IMU sits on the drone, in degrees, in the drone's body frame (x forward, y left, z up). It matters on hardware where the IMU is not mounted level and facing forward; without it the IMU is taken to be at the body frame. A camera sits at the IMU's mount composed with Kalibr's `T_imu_cam`. |
 
 ### The fit report: exact or closest
@@ -606,11 +620,12 @@ differences (simulator minus yours, in pixels).
 | pinhole + radtan, 90 degrees or wider | fisheye with a tangent series that imitates a pinhole | closest, with the projection error reported |
 | omni, eucm | not supported | refused |
 
-`stack rig` refuses a camera of those models; recalibrate
-with Kalibr's pinhole-radtan, pinhole-equi or double sphere (`ds-none`)
-models. For a closest match, read the reported differences before you trust
-a comparison against your real recordings: a distortion the simulator does
-not draw is a real difference in what your software sees.
+`stack rig` refuses a camera of those models (exit 1, naming the camera,
+with the fit of the others; nothing is written); recalibrate with Kalibr's
+pinhole-radtan, pinhole-equi or double sphere (`ds-none`) models. For a
+closest match, read the reported differences before you trust a comparison
+against your real recordings: a distortion the simulator does not draw is a
+real difference in what your software sees.
 
 ### Statuses
 
@@ -643,7 +658,9 @@ when TEVV built or derived it, pins the stack again, notes the change in
 `onboarding.json` and clears the live check. Without `--yes` it changes
 nothing and tells you what it would replace. The stack's topics may have
 changed with the image, so run `stack discover` again afterwards and look at
-what `stack wire` proposes.
+what `stack wire` proposes. A stack with no `tevv.lock` (one written by hand
+and never locked) has nothing pinned, so it is not checked for a newer image;
+`stack list --outdated` says so once in that stack's entry.
 
 ## From a component.yaml
 
