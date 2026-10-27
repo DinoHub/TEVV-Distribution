@@ -671,7 +671,7 @@ records nothing else and scores nothing.
 | `--seconds S` | How long the topics are watched once the drone is handed to your stack (default 30). It cannot be longer than the check mission (150 s). |
 | `--timeout S` | How long the check flight may run before it fails. By default it is what a campaign allows the check mission: about 990 s, and 20 times that when your stack runs sim-time lockstep (the simulation then runs slower than the clock on the wall). Give a number above 0 to use another. |
 | `--keep` | Leave the check stack running afterwards, the simulator included, to look at its logs (the probe may still be running in its interface container). |
-| `--progress FILE` | Append the check's progress to FILE as JSON lines, the same `run.phase` events a campaign's runs write (`run_key` is `live-check-<id>`), plus the phase `watching` when TEVV starts watching the topics (its `detail` says whether from the hand-over or on the ground). |
+| `--progress FILE` | Append the check's progress to FILE as JSON lines, the same `run.phase` events a campaign's runs write (`run_key` is `live-check-<id>`), plus the phase `watching` when TEVV starts watching the topics (its `detail` says whether from the hand-over or on the ground). A stop file in FILE's folder (`campaign.stop`, the marker that stops a campaign's run) stops the check: it ends as not judged (`flight_failed`, "stopped by the user") and records nothing. |
 
 The check stack is generated into `generated/live-check/<id>` in your
 workspace, and stopped at the end unless `--keep`. To read its logs, or stop
@@ -717,9 +717,11 @@ yours to fix:
   input your estimator needs).
 - TEVV's interface stopped on your stack's error before the drone took off:
   a wiring line names a topic of a type it cannot pass on, or your `setup()`
-  or a callback of yours raised. The reason quotes the error; the topics are
-  then watched on the ground as above. (The same error during take-off is a
-  failed take-off, which is not judged: see `not_handed_over` below.)
+  or a callback of yours raised. The interface has exited by then, so
+  nothing is watched: the check records the fail from the interface's log,
+  quoting its error line, followed by "your stack's interface stopped
+  before TEVV could hand it the drone". (The same error during take-off is
+  a failed take-off, which is not judged: see `not_handed_over` below.)
 - None of your nodes appeared on the stack's ROS domain. Your image may set
   `ROS_DOMAIN_ID` or `CYCLONEDDS_URI` itself (TEVV sets both), or not run
   Cyclone DDS (`stack prepare-image` adds it), or its container is not
