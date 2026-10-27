@@ -1,6 +1,8 @@
 """SUPER local planner, as a stack (imported from components/super-lockstep).
 
-SUPER and its adaptor run unmodified in dhdevspace/auto_mns:super_runtime-ms.1.
+SUPER and its adaptor run unmodified in dhdevspace/auto_mns:super_runtime-ms.1-cyclone, the published
+image with Cyclone DDS added (examples/images/super_runtime-ms.1-cyclone.Dockerfile): every
+container of a stack runs on Cyclone.
 This folder adds, at /stack/files:
 - sim_time.launch.py: the adaptor launch with use_sim_time on every node
   (it declares none, so SUPER sampled its trajectories on the wall clock).
@@ -25,7 +27,7 @@ class Super(Interface):
     needs = ["ground_truth", "point_cloud"]
     containers = {
         "super": Container(
-            "dhdevspace/auto_mns:super_runtime-ms.1",
+            "dhdevspace/auto_mns:super_runtime-ms.1-cyclone",
             command=(
                 "set +u && source /opt/ros/humble/setup.bash"
                 " && python3 /stack/files/wait_airborne.py"

@@ -1,6 +1,8 @@
 """MIGHTY local planner, as a stack (imported from components/mighty-lockstep).
 
-MIGHTY and its adaptor run unmodified in dhdevspace/auto_mns:mighty_algo_only.
+MIGHTY and its adaptor run unmodified in dhdevspace/auto_mns:mighty_algo_only-cyclone, the published
+image with Cyclone DDS added (examples/images/mighty_algo_only-cyclone.Dockerfile): every
+container of a stack runs on Cyclone.
 This folder adds, at /stack/files:
 - sim_time.launch.py: the adaptor launch with use_sim_time on every node.
 - wait_airborne.py: MIGHTY starts once the drone is airborne and steady.
@@ -28,7 +30,7 @@ class Mighty(Interface):
     needs = ["ground_truth", "point_cloud"]
     containers = {
         "mighty": Container(
-            "dhdevspace/auto_mns:mighty_algo_only",
+            "dhdevspace/auto_mns:mighty_algo_only-cyclone",
             command=(
                 "source /opt/ros/humble/setup.bash"
                 " && python3 /stack/files/wait_airborne.py"

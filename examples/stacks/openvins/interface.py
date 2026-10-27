@@ -1,6 +1,9 @@
 """OpenVINS stereo VIO, as a stack (imported from components/openvins).
 
-TEVV's waypoint follower flies the mission; OpenVINS estimates. config/ is the
+TEVV's waypoint follower flies the mission; OpenVINS estimates, in the
+published OpenVINS image with Cyclone DDS added
+(examples/images/vio-estimator-openvins-69488123-cyclone.Dockerfile): every
+container of a stack runs on Cyclone. config/ is the
 frozen calibration of the reference stereo rig (calibration-campaign-v1), so
 check.py runs first and refuses a rig the calibration does not describe.
 OpenVINS reads the stereo pair and the IMU under the names its kalibr chains
@@ -19,7 +22,7 @@ class Openvins(TevvDefault):
     needs = ["ground_truth", "stereo_primary", "imu"]
     containers = {
         "ov_msckf": Container(
-            "dhdevspace/auto_mns:vio-estimator-openvins-69488123",
+            "dhdevspace/auto_mns:vio-estimator-openvins-69488123-cyclone",
             command=("OPENVINS_CONFIG=/stack/config python3 /stack/check.py"
                      " && exec ros2 launch ov_msckf subscribe.launch.py"
                      " config_path:=/stack/config/estimator_config.yaml use_stereo:=true max_cameras:=2")),
