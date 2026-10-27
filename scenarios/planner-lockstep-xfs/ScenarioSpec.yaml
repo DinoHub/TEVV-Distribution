@@ -1,0 +1,90 @@
+# A local planner on the XFS yard slalom under sim-time lockstep (ADR 0004).
+# The simulation holds every 0.1 s of sim time (conditions.lockstep.grid_hz)
+# until the stack flying Drone1 has caught up: a stack declaring
+# Lockstep(ack_on=...) (examples/stacks/super, examples/stacks/mighty) is a
+# participant; any other flies as usual. Its lidar and odometry come from every
+# physics step on that grid.
+#
+# The slalom: three goals, in metres from the take-off spot, 3 m above the
+# ground. A row of stacked containers, 4 to 4.5 m tall, runs from about
+# (-27, -12) to (-5, -23) across the straight line south-west of the spawn:
+#   1. round the row's west end, in the open (35 m)
+#   2. behind the row, the yard-detour goal (19 m)
+#   3. along the row's far side, south-east (19 m)
+schema: mns.scenario.v1
+id: planner-lockstep-xfs
+name: Local planner slalom over XFS under sim-time lockstep
+stack_name: planner-lockstep-xfs
+
+environment:
+  id: xfs-level
+  version: 1.0.2
+  artifact_digest: sha256:7eeb41a5ad04d3d2f4bd8c5d876703793b7485d93d59d07172d12c174c100871
+
+runtime:
+  features:
+    sim_real_eval: false
+    ros2_bridge: true
+    qgroundcontrol: false
+    mavros: true
+
+vehicles:
+- id: drone_1
+  name: Drone1
+  runtime_name: Drone1
+  ros_domain_id: 1
+  start:
+    x: 423
+    y: -906
+    z: -21.0
+  cameras:
+    front:
+      position:
+        x: 0.15
+        y: 0
+        z: -0.25
+      capture_settings:
+      - image_type: 0
+        width: 640
+        height: 480
+        fov_degrees: 80
+  sensors:
+    imu: true
+    gps: true
+    barometer: true
+    magnetometer: true
+    gpu_lidar: true
+
+conditions:
+  lockstep:
+    grid_hz: 10
+
+missions:
+- id: slalom
+  drone: Drone1
+  type: waypoints
+  points:
+  - [-34, -6, 3]
+  - [-30, -25, 3]
+  - [-12, -33, 3]
+  reach_radius_m: 1.0
+  # Three legs of up to 120 sim seconds each (sim seconds: the referee's
+  # budgets count sim time under lockstep).
+  timeout_s: 360
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 0
+  - id: goals
+    type: goals_reached
+    check:
+      min: 1.0
+  - id: clearance
+    type: cloud_clearance
+    check:
+      min: 0.3
+  - id: to-goal
+    type: time_to_goal
+  - id: efficiency
+    type: path_efficiency

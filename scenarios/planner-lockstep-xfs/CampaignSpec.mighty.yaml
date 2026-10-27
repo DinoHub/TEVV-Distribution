@@ -1,0 +1,24 @@
+# MIGHTY on the yard slalom with and without sim-time lockstep.
+#   lockstep   the sim holds each 0.1 s slot until MIGHTY has published
+#              point_A since (only on a successful replan) or 1 s has passed.
+#   free       lockstep forced off: the sim runs on while MIGHTY replans.
+# The stack is examples/stacks/mighty, copied into stacks/mighty.
+schema: mns.campaign.v1
+id: mighty-lockstep-slalom
+name: 'MIGHTY slalom: lockstep vs free'
+scenario: ./ScenarioSpec.yaml
+stacks:
+  Drone1: mighty
+variants:
+- id: lockstep
+  name: Lockstep, MIGHTY a participant
+- id: free
+  name: Lockstep forced off
+  overrides:
+    conditions:
+      render:
+        system_settings:
+          r.Fisheye.Lockstep: 0
+repeats: 2
+recording:
+  keep: all

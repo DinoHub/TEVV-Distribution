@@ -50,6 +50,8 @@ generated/
 !/scenarios/super-yard-detour/
 # Four fisheyes on one shared cubemap, the rig the dashboard's camera rig editor makes.
 !/scenarios/fisheye-surround-xfs/
+# A local planner stack under sim-time lockstep (examples/stacks/super, examples/stacks/mighty).
+!/scenarios/planner-lockstep-xfs/
 /scenarios/fisheye-surround-xfs/phase-state.json
 /scenarios/fisheye-surround-xfs/ScenarioSpec.baseline.yaml
 !/scenarios/vio-reference/**
