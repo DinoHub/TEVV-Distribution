@@ -27,4 +27,25 @@ docker build -t dhdevspace/auto_mns:mighty_algo_only-cyclone -f examples/images/
 docker build -t dhdevspace/auto_mns:vio-estimator-openvins-69488123-cyclone -f examples/images/vio-estimator-openvins-69488123-cyclone.Dockerfile examples/images
 ```
 
+## Example tests
+
+A test (`tests/<id>.yaml`) says which stack flies each drone of a scenario;
+the dashboard's Run step lists the tests in `tests/`, which TEVV does not track
+either. `tests/` here holds tests that fly the stacks above:
+
+| Test | Scenario | Who flies |
+| --- | --- | --- |
+| `planner-lockstep-super` | `planner-lockstep-xfs` (yard slalom) | Drone1: `super` |
+| `planner-lockstep-mighty` | `planner-lockstep-xfs` (yard slalom) | Drone1: `mighty` |
+
+```bash
+cp examples/tests/planner-lockstep-super.yaml tests/
+./tevv campaign run tests/planner-lockstep-super.yaml
+```
+
+The lockstep vs free comparisons are campaigns beside the scenario:
+`scenarios/planner-lockstep-xfs/CampaignSpec.super.yaml` and
+`CampaignSpec.mighty.yaml`. Neither is named `CampaignSpec.yaml`, which
+`campaign run <folder>` would run in place of the scenario itself.
+
 See [docs/interface/stacks.md](../docs/interface/stacks.md) for every declaration.

@@ -535,4 +535,5 @@ differently is listed as a TODO in the file:
 
 `examples/stacks/` holds three finished imports: `openvins` (an estimator
 TEVV flies for), `super` and `mighty` (local planners, both lockstep
-participants). Copy one into `stacks/` to use it.
+participants). Copy one into `stacks/` to use it; `examples/tests/` holds tests
+that fly SUPER and MIGHTY on `planner-lockstep-xfs` (copy into `tests/`).

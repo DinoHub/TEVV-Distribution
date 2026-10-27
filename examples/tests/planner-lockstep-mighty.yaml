@@ -1,0 +1,10 @@
+# MIGHTY flies the yard slalom (scenarios/planner-lockstep-xfs) under sim-time
+# lockstep. Copy into tests/ (and examples/stacks/mighty into stacks/); the
+# dashboard's Run step then lists it, or:  ./tevv campaign run tests/planner-lockstep-mighty.yaml
+schema: tevv.test.v1
+name: MIGHTY on the yard slalom
+description: MIGHTY (examples/stacks/mighty) flies Drone1's slalom, a lockstep participant on /NX01/point_A.
+scenario: planner-lockstep-xfs
+drones:
+  Drone1: mighty
+repeats: 1

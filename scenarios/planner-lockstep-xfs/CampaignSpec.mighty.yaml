@@ -2,7 +2,8 @@
 #   lockstep   the sim holds each 0.1 s slot until MIGHTY has published
 #              point_A since (only on a successful replan) or 1 s has passed.
 #   free       lockstep forced off: the sim runs on while MIGHTY replans.
-# The stack is examples/stacks/mighty, copied into stacks/mighty.
+# The stack is examples/stacks/mighty, copied into stacks/mighty. Run it with
+#   ./tevv campaign run scenarios/planner-lockstep-xfs/CampaignSpec.mighty.yaml
 schema: mns.campaign.v1
 id: mighty-lockstep-slalom
 name: 'MIGHTY slalom: lockstep vs free'

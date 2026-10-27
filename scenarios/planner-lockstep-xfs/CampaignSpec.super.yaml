@@ -3,7 +3,11 @@
 #              /planner_state since (its Lockstep(ack_on=...)), so a slow
 #              replan costs wall time, not flight time.
 #   free       lockstep forced off: the sim runs on while SUPER replans.
-# The stack is examples/stacks/super, copied into stacks/super.
+# The stack is examples/stacks/super, copied into stacks/super. Run it with
+#   ./tevv campaign run scenarios/planner-lockstep-xfs/CampaignSpec.super.yaml
+# Not named CampaignSpec.yaml: `campaign run <folder>` would run it in place of
+# the scenario itself (the dashboard's Run plan, and `run planner-lockstep-xfs`).
+# One SUPER run from the dashboard's Run step: examples/tests/planner-lockstep-super.yaml.
 schema: mns.campaign.v1
 id: super-lockstep-slalom
 name: 'SUPER slalom: lockstep vs free'
