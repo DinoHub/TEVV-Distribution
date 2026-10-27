@@ -523,6 +523,7 @@ stop and come back.
 ./tevv stack rig my-stack --kalibr-camchain camchain-imucam.yaml --kalibr-imu imu.yaml
 ./tevv stack wire my-stack --autopilot px4                                           # writes interface.py
 ./tevv stack lock my-stack                                                           # pins the images
+./tevv stack live-check my-stack                                                     # flies it once
 ```
 
 1. **prepare-image** builds your Dockerfile folder (`--dockerfile-dir DIR`) or
@@ -551,6 +552,8 @@ stop and come back.
    When you have edited `interface.py` since, `wire` writes
    `interface.proposed.py` beside it instead; `--force` replaces your file.
 5. **lock** is [Pinning a stack](#pinning-a-stack).
+6. **live-check** flies the stack once and proves its topics flow
+   ([The live check](#the-live-check)).
 
 Your software keeps its own topic names; `interface.py` is the only place
 that knows both sides. Onboarding takes an id of your own: `discover`, `rig`
@@ -639,9 +642,83 @@ and the dashboard's Stacks page shows the same word.
 | out of date | An image the stack pins has moved: a newer image sits under the same tag. This wins over the other three. |
 | not checked | No live check has been recorded. Every stack you onboard starts here. |
 
-The live check, which starts the stack and proves its topics actually flow,
-is a later addition: until it exists, a stack you onboard stays `not checked`
-once locked. `stack check` and a first run are how you find out today.
+A stack you onboard stays `not checked` until you run
+[the live check](#the-live-check).
+
+### The live check
+
+```bash
+./tevv stack live-check my-stack
+./tevv stack live-check my-stack --seconds 60 --keep
+```
+
+It flies your stack once on a scenario TEVV ships (the onboarding check), so
+you need no test of your own to find out whether it works. The scenario is
+one ArduCopter over the XFS container yard, carrying only your stack's rig
+(its cameras, IMU or lidar from `rig/rig.yaml`) and ground truth, and a short
+box to fly. TEVV starts the stack, takes off, and hands the drone to your
+software. Measuring starts at that hand-over: for `--seconds` TEVV watches
+every topic `interface.py` wires, on your stack's ROS domain and on the
+drone's, and judges them.
+
+| Flag | What |
+| --- | --- |
+| `--seconds S` | How long the topics are watched once the drone is handed to your stack (default 30). It cannot be longer than the check mission. |
+| `--timeout S` | How long the check mission may run before the run fails (default 1000). |
+| `--keep` | Leave the check stack running afterwards, to look at its logs; stop it with `mns-stacks stop --stack DIR`. |
+
+Run it on a machine whose GPU is free: the simulator renders your cameras,
+and one that is starved of the GPU delivers them too slowly to judge.
+
+**Pass.** Every input TEVV forwards reached your software at its expected
+rate, and every output you publish (the command, the estimate, the status)
+came back and reached the drone. The verdict, the images it ran on and the
+rate of each topic are recorded in `onboarding.json`, and the stack becomes
+`ready`. Changing the images it pins, `interface.py` or the rig afterwards
+takes that back; run the check again.
+
+**Fail (exit 1).** The verdict is recorded with one reason per problem, each
+naming its topic and numbers, and the stack becomes `needs fix`. These are
+yours to fix:
+
+- None of your nodes appeared on the stack's ROS domain. Your image may set
+  `ROS_DOMAIN_ID` or `CYCLONEDDS_URI` itself (TEVV sets both), or not run
+  Cyclone DDS (`stack prepare-image` adds it), or its container is not
+  running.
+- Nothing in your software subscribes to an input TEVV forwards. The reason
+  lists the topics your software does subscribe to.
+- A QoS mismatch: your software subscribes reliable but every publisher is
+  best effort, or transient local but every publisher is volatile. Nothing
+  is delivered, and the reason names both settings.
+- Your software never published an output, or advertises it but sent nothing
+  during the window.
+- Your publisher is best effort but TEVV subscribes reliable. Publish
+  reliable.
+- Your software publishes the command or estimate but nothing reached the
+  drone. The reason quotes the interface's own log line when it has one (a
+  message of a type it cannot pass on, or nothing to advertise it).
+- Your stamps are more than 5 s behind or ahead of simulation time. Set
+  `use_sim_time` in your nodes.
+- A container of yours exited. The reason gives its exit code and its last
+  log lines.
+
+**Could not check (exit 2).** Nothing is recorded and the stack keeps its
+status: the problem is on TEVV's side, or the run never got far enough to
+judge you. The error says which:
+
+- The check flight did not finish (the simulator or the pilot failed, or the
+  timeout passed). `mns-stacks logs --stack DIR` shows why (the error prints the folder).
+- The run never handed control to your stack: the mission ended before the
+  hand-over (take-off failed, or the stack never became ready), or the probe
+  saw no hand-over.
+- The simulator delivered too slowly: an input arrived below half its
+  expected rate, or not at all. Free the GPU of other simulators and run the
+  check again.
+- TEVV published nothing on an input (the simulator sensor may be missing),
+  or could not read an input's rate.
+- The live probe could not run, or did not finish: the interface container
+  may be stuck. Rebuild the interface image, or set `TEVV_INTERFACE_IMAGE`
+  to one that starts, then run the check again.
 
 ### Out of date, and replace
 
