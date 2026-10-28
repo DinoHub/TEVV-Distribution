@@ -102,6 +102,7 @@ has it.
 | `network` | `None` | `Network("<docker network>", domain=<ROS_DOMAIN_ID>)`: a stack you start yourself, in your own Docker network; declare no `containers` ([below](#a-stack-you-start-yourself)). |
 | `parameters` | `{}` | `name: Parameter(default, ...)`: settings a test sets or sweeps ([below](#parameters)). |
 | `messages` | `[]` | `Messages(image, packages=[...])`: your own ROS message types ([below](#your-own-message-types)). |
+| `watch` | `[]` | Outputs of your software, of any type, for [the live check](#the-live-check) to judge: topics, or `Watch(topic, min_hz=...)` ([below](#watching-outputs-of-any-type)). |
 | `scoring` | `None` | `Scoring(plan=..., checks={...})`: your plan's freshness and your own pass/fail limits ([below](#scoring-your-own-outputs)). |
 | `lockstep` | `None` | `Lockstep(ack_on=... \| status_topic=..., timeout_ms=...)`: the simulation waits for your stack ([below](#sim-time-lockstep)). |
 
@@ -139,8 +140,18 @@ Container(image="me/planner:1",            # required
           env={"MY_SETTING": "1"},
           gpu=True,                         # give it the GPU
           entrypoint=None, working_dir=None,
-          run_as="platform")                # platform: the host user, HOME=/tmp; "image": the image's own user
+          run_as="platform",                # platform: the host user, HOME=/tmp; "image": the image's own user
+          ports=["8080:80", "9000:9000/udp"],          # HOST:CONTAINER, optionally /udp
+          volumes={"engines": "/engines"},              # a named volume that outlives a run
+          once=False,                       # an init step: runs once, done at exit 0, never restarted
+          fcu=False)                        # a second MAVLink link to the autopilot (see below)
 ```
+
+`once=True` marks an init step, such as a container that downloads a model or
+builds an engine into a volume and then exits: TEVV does not restart it, and
+the live check does not count its clean exit as a crash. Discover accepts an
+extra container that exits 0 while the main one keeps running, and `stack
+wire` writes `once=True` for it.
 
 Every container gets:
 
@@ -162,6 +173,40 @@ nodes on the wall clock: wrap it in one of your own that sets it for every
 node (`SetParameter(name="use_sim_time", value=True)`, as the examples'
 `files/sim_time.launch.py` do). Wall-clock timers (`create_wall_timer`)
 stay on the wall clock either way.
+
+`ports` publishes a container port on the host, as `"HOST:CONTAINER"` or
+`"HOST:CONTAINER/udp"`. Host ports are 1024 or higher. A stack that
+publishes host ports can be bound to one drone only: two drones' copies of it
+would want the same port, so the generator refuses the second and names the
+port.
+
+`volumes` maps a name to an absolute path inside the container. Each is a named
+Docker volume, `tevv-stack-<stack id>_<name>`, that outlives a run: the place
+for a TensorRT engine cache that takes minutes to build and should not be
+built again on every run. A host path on the left is not accepted (put team
+files in `files/`, which is `/stack/files`), and neither is a path under
+`/stack`, `/shared`, `/cfg` or `/mns/out`, which TEVV mounts itself.
+
+`fcu=True` is accepted but nothing can honour it yet. It would give the
+container its own MAVLink link to the drone's autopilot (so that it could run
+its own MAVROS), and no autopilot offers a second link: PX4's router endpoints
+belong to TEVV and AirSim, and ArduPilot's SITL serves MAVROS on tcp 5760
+only. `stack check` refuses a stack that sets it, and says so. Use TEVV's
+MAVROS topics, `/<drone>/mavros/...`, through the interface instead.
+
+A stack of three containers, two of them on the GPU and sharing a TensorRT
+engine cache. The main one is keyed by the stack id, `casio`, as `stack wire`
+writes it:
+
+```python
+containers = {
+    "casio":      Container(image="dhdevspace/auto_mns:casio-node"),
+    "detection":  Container(image="dhdevspace/auto_mns:casio-detection",
+                            gpu=True, volumes={"engines": "/engines"}),
+    "da3":        Container(image="dhdevspace/auto_mns:casio-da3",
+                            gpu=True, volumes={"engines": "/engines"}),
+}
+```
 
 ### Parameters
 
@@ -217,6 +262,28 @@ A scenario's observers judge every stack the same way, on what TEVV owns.
 
 With observers in the scenario, your checks join your drone's observer
 scorer; without, your scorer runs on its own after each run.
+
+### Watching outputs of any type
+
+```python
+watch = ["/detections", Watch("/depth/image", min_hz=5)]
+```
+
+A stack's useful outputs are often its own (detections, a depth image), which
+TEVV has no wiring line for, so [the live check](#the-live-check) would have
+nothing to look at. `watch` names outputs of your software, of any type, that
+the check judges: each must be published during the window, and at `min_hz`
+or more when you give one. The check fails, with the reason, when a watched
+topic is never published, is advertised but silent, runs below `min_hz`, or
+has a type the interface image does not have, which you fix by adding its
+package to `messages=`.
+
+`stack wire --watch TOPIC` (repeatable) writes the list for you, and
+`--watch TOPIC=HZ` writes `Watch(TOPIC, min_hz=HZ)`. Without the flag it
+writes the list empty, so name every topic again, with its rate, when you
+wire again (the dashboard's Wire step sends the stack's own list and rates),
+and `interface.py`
+gets `# could watch:` comment lines for the outputs it found, so you can pick.
 
 ### Sim-time lockstep
 
@@ -509,6 +576,425 @@ every hash. An image the lock does not name runs by its tag, and `stack
 check` warns; a `requirements.txt` that is not locked, or changed since, is
 refused. Lock again after changing an image tag or a requirement, and commit
 the lock with the stack.
+
+## Onboarding a stack
+
+If your software already exists as an image (or a Dockerfile folder) and you
+have its camera calibration, these commands build the stack for you instead
+of writing `interface.py` by hand. Each step records what it did, so you can
+stop and come back.
+
+```bash
+./tevv stack prepare-image my-stack --dockerfile-dir ~/my-software
+./tevv stack discover my-stack --image tevv-local/my-software:latest-tevv-cyclone   # its ROS graph
+./tevv stack rig my-stack --kalibr-camchain camchain-imucam.yaml --kalibr-imu imu.yaml
+./tevv stack wire my-stack --autopilot px4                                           # writes interface.py
+./tevv stack lock my-stack                                                           # pins the images
+./tevv stack live-check my-stack                                                     # flies it once
+```
+
+1. **prepare-image** builds your Dockerfile folder (`--dockerfile-dir DIR`) or
+   takes a published image (`--image IMAGE`), and adds Cyclone DDS when the
+   image lacks it, as `<repo>:<tag>-tevv-cyclone`. A Dockerfile folder is
+   built as `tevv-local/<folder name>:latest` (`--tag TAG` names another
+   tag), so `~/my-software` above becomes `tevv-local/my-software:latest`,
+   and `tevv-local/my-software:latest-tevv-cyclone` once Cyclone is added.
+   It prints the image it made: that is the one to discover. Give it the
+   stack id to record the image for that stack; without an id it only
+   builds.
+2. **discover** starts the image (`--image IMAGE`, required: the image
+   prepare-image printed), waits for its ROS graph to settle (unchanged for
+   `--settle S` seconds), and lists each node with the topics it subscribes
+   to and publishes, with their types. discover makes the stack's folder when it is
+   missing. `--timeout S` (default 60) is the
+   time its nodes may take to appear; `--settle` (1 to 600, default 5) is
+   waited on top of it. `--command CMD` says what starts your
+   software when the image's own command is not it, and `--gpu` runs it with
+   the GPU. `--name NAME` names your main container in `interface.py`
+   (default: the stack id; the Container name field in the dashboard). A stack of several containers names the others with
+   `--also NAME=IMAGE` (with `--also-command NAME=CMD` and `--also-gpu NAME`
+   for that one): every image runs together, as it will in a run, and the
+   discovery records each as a container. The stack's folder is mounted
+   read-only at `/stack` in all of them, so its `files/` is `/stack/files`.
+   A container that starts its nodes late (one that builds a TensorRT
+   engine first) needs a longer `--settle`, or its topics are missing. When
+   your nodes publish nothing beyond the topics every node has, discover
+   warns: a command that waits for the simulator (a take-off gate) shows only
+   the gate, so discover a command that starts your nodes directly and add
+   the gate back in `interface.py`.
+   When a container stops before discovery finishes, discover says what its
+   exit code means and what to do
+   ([When discover stops short](#when-discover-stops-short)).
+   When the discovery did not settle or its
+   container exited, or the image differs from the one prepared, `wire`
+   still writes `interface.py` but warns you to discover again.
+3. **rig** describes the sensors your drone carries (below).
+4. **wire** matches the discovered topics to what the rig gives the drone,
+   and writes `stacks/<id>/interface.py`: one `forward`, `command_from` or
+   `estimate_from` line per match, and a `# not wired:` comment for a topic
+   left over. It writes every container discovery recorded, each with
+   `run_as="image"`: discover runs them as the image's own user, so that is
+   what it proved works (under the default, `platform`, the host user with
+   `HOME=/tmp`, an image that writes to its own folders fails). `--watch TOPIC`
+   (repeatable; `TOPIC=HZ` with the lowest rate you accept) adds an output of your software to `watch`
+   ([Watching outputs of any type](#watching-outputs-of-any-type)); without
+   it, `# could watch:` lines list the candidates.
+   `--autopilot simpleflight|px4|ardupilot` picks what the drone
+   flies on (default: the stack's current autopilot, else `simpleflight`).
+   `--ready TOPIC` (repeatable, absolute) writes `ready = [...]`: topics of
+   your software that must publish before TEVV hands it the drone; without
+   the flag `ready` is empty (the Ready checkboxes in the dashboard's Wire
+   step). `--command CMD` and `--also-command NAME=CMD` set what a container
+   runs in a test when that differs from what discovery ran: for example
+   MIGHTY is discovered with a command that starts it directly, and flown
+   with the same command behind a take-off gate (the "What each container
+   runs in a test" fields in the Wire step).
+   When you have edited `interface.py` since, `wire` writes
+   `interface.proposed.py` beside it instead; `--force` replaces your file.
+5. **lock** is [Pinning a stack](#pinning-a-stack).
+6. **live-check** flies the stack once and proves its topics flow
+   ([The live check](#the-live-check)).
+
+Your software keeps its own topic names; `interface.py` is the only place
+that knows both sides. Onboarding takes an id of your own: `discover`, `rig`,
+`wire`, `prepare-image` (with an id), `lock`, `replace` and `live-check`
+refuse the built-in stacks' ids (`tevv-default`, `tevv-default-px4`,
+`tevv-default-ardupilot`). Writing a rig or
+`interface.py` clears the stack's live check, since what was checked has
+changed.
+
+### When discover stops short
+
+Discover stops short in four ways, and says which, with the container's last
+lines (or that it printed nothing). The dashboard's Discover step shows the
+same explanation in its own words, with what to do, and folds the CLI's
+message under Details.
+
+- **No Cyclone DDS.** The image was not started: prepare it (the Image step,
+  or `tevv stack prepare-image`) and discover the image that prints.
+- **A container stopped.** Read its exit code (below).
+- **No ROS 2 node appeared** within the timeout: give the command that
+  starts your software (`--command`, the Start command field), or a longer
+  `--timeout` when it downloads or builds something first.
+- **The graph kept changing:** a node restarting in a loop (its last lines
+  say why), or nodes that start one after another (a longer `--settle`).
+
+Discover records what each image runs on its own (`image_command` in the
+discovery: its entrypoint and command), so a container that stopped at once
+is explained by what it ran. When it stops short it also looks inside the
+image (`image_contents`): its colcon workspaces, the executables `ros2 run`
+starts, launch files and parameter files outside `/opt/ros`, and names them.
+The dashboard lists them with **Use**, which writes a start command for one:
+its workspace sourced, `exec` so it stays in the foreground, and its
+package's parameter file when there is exactly one. A start command that
+only prepares the shell (`source`, `export`, `cd`, ...) is said to start
+nothing.
+
+#### Exit codes
+
+A container's exit code is set by the shell and Docker: 126 and 127 come from
+the shell, and 128 + N means the container was killed by signal N.
+
+| Code | What it means | What to do |
+|---|---|---|
+| 0, no start command | It finished: the image's own command starts nothing that stays. Most often that command is a bare shell (`bash`), which ends at once when it has nothing to run; casio-detection's is `/entrypoint.node.sh bash`. | Give the command that starts your nodes, e.g. `source /ros2_ws/install/setup.bash && ros2 launch my_pkg bringup.launch.py`. |
+| 0, a start command that only sets up | It only prepared the shell (for example `source /ros2_ws/install/setup.bash`) and started nothing. | Add the command that runs your software after it with `&&`; discover names what the image provides. |
+| 0, with a start command | Your command finished instead of keeping your nodes running: it sent its work to the background with `&`, or its last command ran and ended. | End it with a command that stays in the foreground, e.g. `exec ros2 launch ...`; the container stops when the last command ends. |
+| 1 | It failed: the reason is in its last lines. | Read them. A file it reads is missing (upload it under Files; it is at `/stack/files/<path>`), a package is not sourced, or it needs the GPU. |
+| 2 | A command was given wrong arguments. | Check the command and its arguments. |
+| 126 | A command was found but could not run: not executable, or no permission. | Make the file executable in the image (`chmod +x`) and readable by its user. |
+| 127 | A command was not found: not installed, or its workspace is not sourced. | Source the workspace at the start of the command, and check its spelling. |
+| 130 | It was interrupted (Ctrl-C, SIGINT). | Run it again. |
+| 134 | It aborted (SIGABRT): a failed assertion, or an exception nothing caught. | Read its last lines: they name the node. |
+| 137 | It was killed (SIGKILL), usually by the out-of-memory killer. | Free memory on the machine (other simulators or stacks), or have it load less. |
+| 139 | It crashed with a segmentation fault (SIGSEGV). | Read its last lines; check the files it reads exist and, for CUDA or TensorRT, that it has the GPU. |
+| 143 | It was told to stop (SIGTERM). | Something stopped it from outside; run it again. |
+| Other above 128 | It was killed by signal (code minus 128). | Read its last lines. |
+| Other | It failed. | Read its last lines. |
+
+### What the stack folder gains
+
+```
+stacks/<id>/
+  files/                your own files, read by your containers at /stack/files
+  rig/
+    rig.yaml            the sensors: cameras, IMU, lidar, where they sit on the drone
+    fit.json            the fit report: your values, the simulator's, the differences
+    kalibr-*.yaml       the Kalibr files you gave, copied beside it
+  onboarding.json       what onboarding did so far
+```
+
+`onboarding.json` holds the discovery (when it ran, the nodes and topics),
+the wiring written into `interface.py`, the image prepared for the stack,
+every replacement (`stack replace`) and the live check. It holds no
+registry logins: TEVV reaches registries only through your own Docker
+configuration. Edit `rig/rig.yaml` by hand if you need to: it is checked
+again the next time it is read (`stack rig --show`, `stack wire`, a run),
+and an error there names the field to fix. Run `stack rig` again to refit
+it.
+
+### The rig
+
+```bash
+./tevv stack rig my-stack --kalibr-camchain camchain-imucam.yaml \
+    --kalibr-imu imu.yaml --camera-names front,back \
+    --topic front=/cam0/image_raw --topic back=/cam1/image_raw --topic imu=/imu0 \
+    --rate front=20 --rate back=20 --imu-mount 0,0,90
+./tevv stack rig my-stack --show        # the stored rig and its fit
+```
+
+The source is Kalibr's `camchain-imucam.yaml` (`--kalibr-camchain FILE`) and
+optionally its `imu.yaml` (`--kalibr-imu FILE`, for the noise and update
+rate), or known sensor models (`--model ID`, a camera, IMU or lidar,
+repeatable) instead of Kalibr files. One drone renders at most four cameras
+at the rate a rig asks for, so a rig with more is refused at this step.
+
+| Flag | What |
+| --- | --- |
+| `--camera-names A,B` | One name per Kalibr camera, in `cam0`, `cam1` order (default `cam0`, `cam1`, ...). A name is a letter, then letters, digits or underscores. |
+| `--topic CAMERA=TOPIC` | The topic your software reads that camera on; `imu=TOPIC` for the IMU. Repeatable. It wins over a guess by name when `wire` matches topics. |
+| `--rate CAMERA=HZ` | The rate the camera is forwarded to your software at (`wire` writes it as `max_hz` on that camera's `forward`, and the fit report shows it). Kalibr does not record one, so a camera runs at 30 Hz unless you say so. The live check confirms the rate the simulator actually delivers. Repeatable. |
+| `--imu-mount ROLL,PITCH,YAW` | Where the IMU sits on the drone, in degrees, in the drone's body frame (x forward, y left, z up). It matters on hardware where the IMU is not mounted level and facing forward; without it the IMU is taken to be at the body frame. A camera sits at the IMU's mount composed with Kalibr's `T_imu_cam`. |
+
+If you have ROS `camera_info` files rather than a Kalibr calibration, give
+one per camera, each with where the camera sits on the drone:
+
+```bash
+./tevv stack rig my-stack --camera-info front=siyi_a8.yaml \
+    --camera-mount front=0.15,0,-0.10,0,25,0
+```
+
+`--camera-mount NAME=X,Y,Z,ROLL,PITCH,YAW` is in metres and degrees, in the
+drone's body frame (x forward, y left, z up), right-handed, and a positive
+pitch tilts the camera down: the example above is 0.15 m ahead of the body
+origin, 0.10 m below it and tilted 25 degrees down. A `plumb_bob` camera is
+fitted as radtan (a nonzero `k3` is refused, since the simulator's radtan has
+none), `equidistant` is kept as it is, and `rational_polynomial` is refused.
+A `camera_info` file cannot be combined with a Kalibr chain in one rig. When
+a rig has cameras the simulator cannot render, they are reported first, before
+any problem with the topic or rate names you gave.
+
+### The fit report: exact or closest
+
+The simulator renders a pinhole camera from a horizontal field of view
+(square pixels, the centre of the image as the principal point, no
+distortion), and its fisheye path takes Kannala-Brandt and double sphere
+calibrations as they are. So your camera is either rendered exactly or by
+the closest thing the simulator can draw, and `stack rig` says which for each
+camera. `rig/fit.json` keeps your values, the simulator's, and the
+differences (simulator minus yours, in pixels).
+
+| Their model | Rendered as | Match |
+|---|---|---|
+| pinhole + equidistant (Kannala-Brandt) | fisheye, Kannala-Brandt series with their coefficients | exact |
+| double sphere | fisheye, double sphere with their xi and alpha | exact |
+| pinhole + radtan (or none), narrower than 90 degrees | pinhole, focal from the mean of fx and fy | closest: fx, fy, centre and distortion differences reported |
+| pinhole + radtan, 90 degrees or wider | fisheye with a tangent series that imitates a pinhole | closest, with the projection error reported |
+| omni, eucm | not supported | refused |
+
+`stack rig` refuses a camera of those models (exit 1, naming the camera,
+with the fit of the others; nothing is written); recalibrate with Kalibr's
+pinhole-radtan, pinhole-equi or double sphere (`ds-none`) models. For a
+closest match, read the reported differences before you trust a comparison
+against your real recordings: a distortion the simulator does not draw is a
+real difference in what your software sees.
+
+### Statuses
+
+`stack list` and `stack show` give each workspace stack one of four statuses,
+and the dashboard's Stacks page shows the same word.
+
+| Status | What makes it |
+| --- | --- |
+| ready | The live check passed, the images it ran on are the ones the stack pins now, `interface.py` and `rig/rig.yaml` are the files it checked, and `stack check` finds nothing wrong. |
+| needs fix | A live check of the current `interface.py` and rig failed, a different image is pinned since it passed, or `stack check` finds a problem. Without such a live check the stack is `not checked`, whatever `stack check` says. |
+| out of date | An image the stack pins has moved: a newer image sits under the same tag. This wins over the other three. |
+| not checked | No live check has been recorded, or `interface.py` or `rig/rig.yaml` changed since it ran (an edit by hand counts: what was checked is no longer what would fly). Every stack you onboard starts here. |
+
+A stack you onboard stays `not checked` until you run
+[the live check](#the-live-check).
+
+### The live check
+
+```bash
+./tevv stack live-check my-stack
+./tevv stack live-check my-stack --seconds 60 --keep
+```
+
+It flies your stack once on a scenario TEVV ships (the onboarding check), so
+you need no test of your own to find out whether TEVV and your software reach
+each other. The scenario is one drone over the XFS container yard, on the
+autopilot your `interface.py` declares, and a small square to fly 2.5 m up.
+The drone carries the scenario's IMU, GPS, barometer and magnetometer plus
+your stack's rig (the cameras, IMU or lidar in `rig/rig.yaml`); a rig sensor
+replaces the scenario's sensor of the same role. TEVV starts your stack, the
+drone takes off (your interface's take-off, on your autopilot), and the
+mission's referee hands the drone to your software; a stack that calls
+`follow_waypoints()` is flown along the square by TEVV. Measuring starts at
+that hand-over: for `--seconds` TEVV watches every topic `interface.py` wires,
+on your stack's ROS domain and on the drone's, and judges them. The check
+records nothing else and scores nothing.
+
+| Flag | What |
+| --- | --- |
+| `--seconds S` | How long the topics are watched once the drone is handed to your stack (default 20). It cannot be longer than the check mission (150 s). |
+| `--timeout S` | How long the check flight may run before it fails. By default it is what a campaign allows the check mission: about 990 s, and 20 times that when your stack runs sim-time lockstep (the simulation then runs slower than the clock on the wall). Give a number above 0 to use another. |
+| `--keep` | Leave the check stack running afterwards, the simulator included, to look at its logs (the probe may still be running in its interface container). |
+| `--progress FILE` | Append the check's progress to FILE as JSON lines, the same `run.phase` events a campaign's runs write (`run_key` is `live-check-<id>`), plus the phase `watching` when TEVV starts watching the topics (its `detail` says whether from the hand-over or on the ground). A stop file in FILE's folder (`campaign.stop`, the marker that stops a campaign's run) stops the check: it ends as not judged (`flight_failed`, "stopped by the user") and records nothing. |
+
+The check stack is generated into `<workspace>/generated/live-check/<id>`
+(your workspace folder), and stopped at the end unless `--keep`. To read its
+logs, or stop one you kept, give that full path:
+
+```bash
+make stacks ARGS="logs --stack <workspace>/generated/live-check/my-stack"
+make stacks ARGS="stop --stack <workspace>/generated/live-check/my-stack"
+```
+
+Run it on a machine whose GPU is free: the simulator renders your cameras,
+and one that is starved of the GPU delivers them too slowly to judge.
+
+**What is expected.** An input is expected at its rig rate, capped by the
+`max_hz` on its `forward` line when that is lower (`max_hz` alone when the
+rig gives no rate; any rate above zero when neither does). An input passes at
+half the rate asked or more; one that passes but is below 90% of it says
+"slower than asked (N%)" in its reason. Under sim-time
+lockstep rates are counted per second of simulation time, which is what your
+sensors run on. A topic written as an f-string on `self.drone` alone
+(`f"/{self.drone}/mavros/setpoint_raw/local"`) is read for the check's drone,
+`Drone1`. A wiring call TEVV cannot read a topic from (an f-string on other
+values, a variable, a call on a drone handle in a many-drone stack) is listed
+as not checked, with its line, and does not fail the check.
+
+**Pass.** Every input TEVV forwards reached your software at its expected
+rate, and every output `interface.py` wires was published by your software;
+the command and the estimate also reached the drone. Every topic in `watch`
+was published by your software, at its `min_hz` when it sets one. The command
+is not expected when TEVV flies your drone (`follow_waypoints()`), and a status only
+has to be published (it may say nothing during the window). The verdict, the
+images it ran on, the files it checked and the rate of each topic are
+recorded in `onboarding.json`, and the stack becomes `ready`. Pinning other
+images takes that back (`needs fix`), and so does editing `interface.py` or
+the rig, by hand or with `wire` and `rig` (`not checked`); run the check
+again.
+
+**Fail (exit 1).** The verdict is recorded with one reason per problem, each
+naming its topic and numbers, and the stack becomes `needs fix`. These are
+yours to fix:
+
+- Your stack never published its estimate, or a topic it lists in `ready`,
+  within the wait after take-off, so TEVV never handed it the drone. TEVV
+  still watches your topics, with the drone back on the ground, for
+  `--seconds`, so the reasons below say why (often: nothing subscribes to an
+  input your estimator needs).
+- TEVV's interface stopped on your stack's error before the drone took off:
+  a wiring line names a topic of a type it cannot pass on, or your `setup()`
+  or a callback of yours raised. The interface has exited by then, so
+  nothing is watched: the check records the fail from the interface's log,
+  quoting its error line, followed by "your stack's interface stopped
+  before TEVV could hand it the drone". (The same error during take-off is
+  a failed take-off, which is not judged: see `not_handed_over` below.)
+- None of your nodes appeared on the stack's ROS domain. Your image may set
+  `ROS_DOMAIN_ID` or `CYCLONEDDS_URI` itself (TEVV sets both), or not run
+  Cyclone DDS (`stack prepare-image` adds it), or its container is not
+  running. Nodes that only launch your software (`ros2 launch`'s own) do not
+  count.
+- Nothing in your software subscribes to an input TEVV forwards. The reason
+  lists the topics your software does subscribe to.
+- A QoS mismatch: your software subscribes reliable but every publisher is
+  best effort, or transient local but every publisher is volatile. Nothing
+  is delivered, and the reason names both settings.
+- Your software never published an output, or advertises the command or
+  estimate but sent nothing during the window.
+- Your publisher is best effort but TEVV subscribes reliable. Publish
+  reliable.
+- Your software publishes the command or estimate but nothing reached the
+  drone. The reason quotes the interface's own log line when it has one (a
+  message of a type it cannot pass on).
+- Your stamps are more than 5 s behind or ahead of simulation time. Set
+  `use_sim_time` in your nodes.
+- A container of yours exited. The reason gives its exit code and its last
+  log lines; one in a restart loop "keeps restarting", with its last exit
+  code. Containers are named as `interface.py` names them. When one of yours
+  is down, the reasons leave out the hint about the stack's ROS domain: the
+  crash is why none of your nodes appeared.
+
+**Could not check (exit 2).** Nothing is recorded and the stack keeps its
+status: the problem is on TEVV's side, or the run never got far enough to
+judge you. The error says which, and with `--json` its `type` names the
+case:
+
+| `type` | What happened |
+| --- | --- |
+| `flight_failed` | The check flight did not finish (the simulator failed, the scenario did not generate, or the timeout passed). The error names the check stack's folder; its logs say why. |
+| `not_handed_over` | The run never handed control to your stack for a reason that is not your stack's: your interface never started, take-off failed, or TEVV saw no hand-over. |
+| `tevv_short` | The simulator delivered an input below half its expected rate, or not at all, or TEVV published nothing on it or could not read its rate. Free the GPU of other simulators and run the check again. |
+| `probe_failed` | TEVV's probe could not run, ended without a result (the error gives its exit code and last lines), or was still running at the end (the interface container may be stuck). Rebuild the interface image, or set `TEVV_INTERFACE_IMAGE` to one that starts, then run the check again. |
+| `refused` | Nothing flew: a built-in stack, a stack that fails `stack check`, a stack on its drone's ROS domain, or a `--seconds` or `--timeout` out of range. |
+
+### Deleting a stack
+
+The dashboard can delete a workspace stack: Delete stack on the stack's tabs,
+or Delete on its card in the wizard. You type the stack's id to confirm. It
+refuses built-in stacks, and any stack while a job, an upload or a live check
+is running. The stack's folder goes; the live check's recordings are kept.
+
+### Files your containers read
+
+Model weights, launch files and configuration go in the stack's `files/`
+folder, which every container sees read-only at `/stack/files`. Put them there
+by copying into `stacks/<id>/files/`, or upload them on the dashboard's
+Stacks page (the Files panel in Discover, and the Files tab afterwards): a
+file may be up to 4 GiB and is streamed to disk. The dashboard refuses an
+upload while a discovery or a live check of that stack is running. Anything
+that should survive a run but is not yours to ship (a TensorRT engine cache)
+belongs in a `volumes` entry instead.
+
+### A worked example: casio-edge
+
+casio-edge is a detection and depth stack of three containers. Discovery
+brings them up together:
+
+```bash
+./tevv stack discover casio --image dhdevspace/auto_mns:casio-node \
+    --also detection=dhdevspace/auto_mns:casio-detection --also-gpu detection \
+    --also da3=dhdevspace/auto_mns:casio-da3 --also-gpu da3 --settle 30
+./tevv stack rig casio --camera-info front=siyi_a8.yaml \
+    --camera-mount front=0.15,0,-0.10,0,25,0
+./tevv stack wire casio --autopilot px4 --watch /detections --watch /depth/image
+```
+
+The detector builds its TensorRT engine for about 20 s before its node
+starts. `--settle 30` waits for it. With the default 5 s, `/detections` is
+missing from the graph.
+
+`wire` writes the three containers, the main one keyed `casio` after the
+stack id, all with `run_as="image"` and `gpu=True` on `detection` and `da3`,
+and `watch = ["/detections", "/depth/image"]` so the live check judges
+the two outputs TEVV has no wiring line for. Add the `engines` volume to
+`detection` and `da3` by hand: discovery cannot know it. Give `/depth/image` a
+`Watch(..., min_hz=5)` if a slow depth stream should fail the check. The
+camera is the SIYI A8, from its `camera_info` file, mounted 0.15 m ahead and
+0.10 m below the body origin and tilted 25 degrees down.
+
+### Out of date, and replace
+
+```bash
+./tevv stack outdated my-stack          # have the images my tevv.lock pins moved?
+./tevv stack list --outdated            # the same for every workspace stack (asks the registries; slower)
+./tevv stack replace my-stack            # says what would change, changes nothing
+./tevv stack replace my-stack --yes     # do it
+```
+
+`stack outdated` compares each image in `tevv.lock` with what its tag points
+to now. `stack replace` takes the newer image: it prepares the image again
+when TEVV built or derived it, pins the stack again, notes the change in
+`onboarding.json` and clears the live check. Without `--yes` it changes
+nothing and tells you what it would replace. The stack's topics may have
+changed with the image, so run `stack discover` again afterwards and look at
+what `stack wire` proposes. A stack with no `tevv.lock` (one written by hand
+and never locked) has nothing pinned, so it is not checked for a newer image;
+`stack list --outdated` says so once in that stack's entry.
 
 ## From a component.yaml
 
