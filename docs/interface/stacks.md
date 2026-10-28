@@ -187,12 +187,18 @@ built again on every run. A host path on the left is not accepted (put team
 files in `files/`, which is `/stack/files`), and neither is a path under
 `/stack`, `/shared`, `/cfg` or `/mns/out`, which TEVV mounts itself.
 
-`fcu=True` is accepted but nothing can honour it yet. It would give the
-container its own MAVLink link to the drone's autopilot (so that it could run
-its own MAVROS), and no autopilot offers a second link: PX4's router endpoints
-belong to TEVV and AirSim, and ArduPilot's SITL serves MAVROS on tcp 5760
-only. `stack check` refuses a stack that sets it, and says so. Use TEVV's
-MAVROS topics, `/<drone>/mavros/...`, through the interface instead.
+`fcu=True` gives the container its own MAVLink link to the drone's PX4, beside
+the one TEVV's MAVROS holds. It works on PX4 in bridge mode only (autopilot
+endpoint docker); host network mode is refused, and the message says to use
+bridge mode. The container gets `MNS_FCU_URL`, a UDP URL to pass as MAVROS's
+`fcu_url` (`mavros_node fcu_url:=$MNS_FCU_URL`). Set your MAVROS
+`component_id:=197`: TEVV's own MAVROS keeps the default, and replies to
+targeted messages reach both. Only one container per drone may set it; a
+second is refused. Commands sent over this link do not pass TEVV's command
+gate, so the team is responsible for them. ArduPilot is refused until its image
+is updated to open a second TCP serial link from an env var; the message says
+so. Until then, use TEVV's MAVROS topics, `/<drone>/mavros/...`, through the
+interface instead.
 
 A stack of three containers, two of them on the GPU and sharing a TensorRT
 engine cache. The main one is keyed by the stack id, `casio`, as `stack wire`
