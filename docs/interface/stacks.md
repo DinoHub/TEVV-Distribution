@@ -661,7 +661,14 @@ message under Details.
 
 Discover records what each image runs on its own (`image_command` in the
 discovery: its entrypoint and command), so a container that stopped at once
-is explained by what it ran.
+is explained by what it ran. When it stops short it also looks inside the
+image (`image_contents`): its colcon workspaces, the executables `ros2 run`
+starts, launch files and parameter files outside `/opt/ros`, and names them.
+The dashboard lists them with **Use**, which writes a start command for one:
+its workspace sourced, `exec` so it stays in the foreground, and its
+package's parameter file when there is exactly one. A start command that
+only prepares the shell (`source`, `export`, `cd`, ...) is said to start
+nothing.
 
 #### Exit codes
 
@@ -671,7 +678,8 @@ the shell, and 128 + N means the container was killed by signal N.
 | Code | What it means | What to do |
 |---|---|---|
 | 0, no start command | It finished: the image's own command starts nothing that stays. Most often that command is a bare shell (`bash`), which ends at once when it has nothing to run; casio-detection's is `/entrypoint.node.sh bash`. | Give the command that starts your nodes, e.g. `source /ros2_ws/install/setup.bash && ros2 launch my_pkg bringup.launch.py`. |
-| 0, with a start command | Your command finished instead of keeping your nodes running. | End it with a command that stays in the foreground, e.g. `exec ros2 launch ...`; one started with `&` runs in the background, and the container stops when the last command ends. |
+| 0, a start command that only sets up | It only prepared the shell (for example `source /ros2_ws/install/setup.bash`) and started nothing. | Add the command that runs your software after it with `&&`; discover names what the image provides. |
+| 0, with a start command | Your command finished instead of keeping your nodes running: it sent its work to the background with `&`, or its last command ran and ended. | End it with a command that stays in the foreground, e.g. `exec ros2 launch ...`; the container stops when the last command ends. |
 | 1 | It failed: the reason is in its last lines. | Read them. A file it reads is missing (upload it under Files; it is at `/stack/files/<path>`), a package is not sourced, or it needs the GPU. |
 | 2 | A command was given wrong arguments. | Check the command and its arguments. |
 | 126 | A command was found but could not run: not executable, or no permission. | Make the file executable in the image (`chmod +x`) and readable by its user. |
