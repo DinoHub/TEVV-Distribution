@@ -296,6 +296,9 @@ in the scenario) the simulation holds time at each slot until your stack has
 caught up, so a slow step costs wall time, never flight time. Outside
 lockstep the declaration does nothing.
 
+Measured capacity, from one drone to ten stacks flown together, is in
+[Stack capacity](../stack-capacity.md).
+
 - `ack_on`: a topic on your side that goes quiet while your software is busy
   (say, blocked in a replan) and keeps publishing when it is idle. Any message
   there tells TEVV your stack has caught up with the latest sim time. A
@@ -999,6 +1002,8 @@ has no camera), so each camera delivers its full rate in simulation time.
 Rates are judged per simulation second. The check runs slower than real time:
 about 0.4 to 0.5 times real time for one drone in TEVV's tests, and more
 cameras or drones slow it further.
+How much slower with ten drones, each with its own stack, is in
+[Stack capacity](../stack-capacity.md).
 
 - **ArduPilot or SimpleFlight only.** Lockstep needs a steppable clock. A PX4
   stack is refused before anything flies. Switch with
