@@ -611,6 +611,9 @@ stop and come back.
    warns: a command that waits for the simulator (a take-off gate) shows only
    the gate, so discover a command that starts your nodes directly and add
    the gate back in `interface.py`.
+   When a container stops before discovery finishes, discover says what its
+   exit code means and what to do
+   ([When discover stops short](#when-discover-stops-short)).
    The stack's folder is made when it is missing. When the discovery did not settle or its
    container exited, or the image differs from the one prepared, `wire`
    still writes `interface.py` but warns you to discover again.
@@ -639,6 +642,47 @@ and `wire` refuse the built-in stacks' ids (`tevv-default`,
 `tevv-default-px4`, `tevv-default-ardupilot`). Writing a rig or
 `interface.py` clears the stack's live check, since what was checked has
 changed.
+
+### When discover stops short
+
+Discover stops short in four ways, and says which, with the container's last
+lines (or that it printed nothing). The dashboard's Discover step shows the
+same explanation in its own words, with what to do, and folds the CLI's
+message under Details.
+
+- **No Cyclone DDS.** The image was not started: prepare it (the Image step,
+  or `tevv stack prepare-image`) and discover the image that prints.
+- **A container stopped.** Read its exit code (below).
+- **No ROS 2 node appeared** within the timeout: give the command that
+  starts your software (`--command`, the Start command field), or a longer
+  `--timeout` when it downloads or builds something first.
+- **The graph kept changing:** a node restarting in a loop (its last lines
+  say why), or nodes that start one after another (a longer `--settle`).
+
+Discover records what each image runs on its own (`image_command` in the
+discovery: its entrypoint and command), so a container that stopped at once
+is explained by what it ran.
+
+#### Exit codes
+
+A container's exit code is set by the shell and Docker: 126 and 127 come from
+the shell, and 128 + N means the container was killed by signal N.
+
+| Code | What it means | What to do |
+|---|---|---|
+| 0, no start command | It finished: the image's own command starts nothing that stays. Most often that command is a bare shell (`bash`), which ends at once when it has nothing to run; casio-detection's is `/entrypoint.node.sh bash`. | Give the command that starts your nodes, e.g. `source /ros2_ws/install/setup.bash && ros2 launch my_pkg bringup.launch.py`. |
+| 0, with a start command | Your command finished instead of keeping your nodes running. | End it with a command that stays in the foreground, e.g. `exec ros2 launch ...`; one started with `&` runs in the background, and the container stops when the last command ends. |
+| 1 | It failed: the reason is in its last lines. | Read them. A file it reads is missing (upload it under Files; it is at `/stack/files/<path>`), a package is not sourced, or it needs the GPU. |
+| 2 | A command was given wrong arguments. | Check the command and its arguments. |
+| 126 | A command was found but could not run: not executable, or no permission. | Make the file executable in the image (`chmod +x`) and readable by its user. |
+| 127 | A command was not found: not installed, or its workspace is not sourced. | Source the workspace at the start of the command, and check its spelling. |
+| 130 | It was interrupted (Ctrl-C, SIGINT). | Run it again. |
+| 134 | It aborted (SIGABRT): a failed assertion, or an exception nothing caught. | Read its last lines: they name the node. |
+| 137 | It was killed (SIGKILL), usually by the out-of-memory killer. | Free memory on the machine (other simulators or stacks), or have it load less. |
+| 139 | It crashed with a segmentation fault (SIGSEGV). | Read its last lines; check the files it reads exist and, for CUDA or TensorRT, that it has the GPU. |
+| 143 | It was told to stop (SIGTERM). | Something stopped it from outside; run it again. |
+| Other above 128 | It was killed by signal (code minus 128). | Read its last lines. |
+| Other | It failed. | Read its last lines. |
 
 ### What the stack folder gains
 
