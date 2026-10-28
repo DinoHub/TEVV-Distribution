@@ -15,14 +15,16 @@
 #                                          interface.py's prints, logs and errors (or a stack container's)
 #   ./tevv results <test> [--format csv|md] one row per run per mission: ended, verdict, observers
 #   ./tevv stop <test>                     stop a running test now
-#   ./tevv observers [--json]              the observer types a mission can list
+#   ./tevv observers [--json]              the observer types, and what each judges (a drone, a camera, the run, a mission)
+#   ./tevv scenario migrate-observers <s> [--dry-run]
+#                                          move a scenario's drone checks from its missions onto its drones
 #   ./tevv suite list | init <id> --scenarios <s>... | check <id> | results <id> | runs <id> | stop <id>
 #   ./tevv suite run <id> [--stack <stack>] a kind of test (local-planner, vio): its scenarios, every drone flown
 #                                          by the stack under test (tevv-default without --stack)
 #   ./tevv sdk                             the TEVV SDK's source, for your editor (.tevv/sdk)
 set -euo pipefail
 cd "$(dirname "$0")"
-usage() { sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; }
 cmd="${1:-}"; shift || true
 case "$cmd" in
   up)        exec make dashboard "$@" ;;
@@ -35,6 +37,7 @@ case "$cmd" in
   logs)      exec make --no-print-directory stacks ARGS="test logs $*" ;;
   results)   exec make --no-print-directory stacks ARGS="campaign status $*" ;;
   stop)      exec make stacks ARGS="campaign cancel --now $*" ;;
+  scenario)  exec make --no-print-directory stacks ARGS="scenario $*" ;;
   observers) image="${METRICS_SERVICE_IMAGE:-$(sed -n 's/^METRICS_SERVICE_IMAGE=//p' .env 2>/dev/null | tail -1)}"
              exec docker run --rm --entrypoint tevv-jsonl-ingest "${image:?set METRICS_SERVICE_IMAGE}" observers "$@" ;;
   suite)     case "${1:-}" in
