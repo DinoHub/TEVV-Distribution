@@ -29,6 +29,9 @@
 #                                            host's contract (the override; warns)
 #   TEVV_RUNS_DIR                            runs directory (default ./runs, or .env)
 #   MNS_IMAGE_PULL_POLICY                    missing (default) | always | never
+#   MNS_SIM_STOP_TIMEOUT                     seconds the simulator gets to shut down
+#                                            on stop (mns-stacks default 60); passed
+#                                            through only when set
 #   MNS_STACKS_DOCKER_ARGS                   extra `docker run` flags (word-split)
 set -euo pipefail
 
@@ -57,6 +60,9 @@ mkdir -p "$runs"
 RUNS_DIR="$(cd "$runs" && pwd)"
 
 PACK_STORE="${MNS_PACK_STORE_ROOT:-$ROOT/.mns/v1/pack-store}"
+# A store reached through a symlink (another checkout's .mns) is mounted at
+# its real path, which is what the container can follow.
+[[ -e "$PACK_STORE" ]] && PACK_STORE="$(cd "$PACK_STORE" && pwd -P)"
 IMAGE_SET_FILE="${MNS_IMAGE_SET_FILE:-$ROOT/images/image-set.generated.yaml}"
 # Generated stacks take their images from the image-set file alone, so an
 # image override in the shell or ./.env (MNS_RUNTIME_HOST_IMAGE,
@@ -64,7 +70,7 @@ IMAGE_SET_FILE="${MNS_IMAGE_SET_FILE:-$ROOT/images/image-set.generated.yaml}"
 # for the commands that generate stacks. Without overrides the file is used
 # as it is.
 case "$1" in
-  generate|campaign)
+  generate|campaign|suite)
     if effective="$("${PYTHON:-python3}" "$ROOT/tools/images.py" effective-image-set \
           --in "$IMAGE_SET_FILE" --out "$ROOT/.mns/image-set.effective.yaml" --dotenv "$ROOT/.env")"; then
       IMAGE_SET_FILE="$effective"
@@ -90,7 +96,21 @@ case "$1" in
   run|stop|status|restart|logs|record|check) needs_socket=true ;;
   campaign)
     case "${2:-}" in run|preflight|status|watch|cancel) needs_socket=true ;; esac ;;
+  test)
+    # logs and watch read and restart a running test's containers.
+    case "${2:-}" in logs|watch) needs_socket=true ;; esac ;;
+  # A suite run flies its campaigns; the others read a run's lock, which asks
+  # Docker whether the run's container is still alive.
+  suite)
+    case "${2:-}" in run|stop|results|runs|list) needs_socket=true ;; esac ;;
 esac
+
+# load-images-env.sh leaves keys that ./.env sets for compose to read; this
+# container is not compose, so read the metrics image from ./.env too.
+METRICS_IMAGE="${METRICS_SERVICE_IMAGE:-}"
+if [[ -z "$METRICS_IMAGE" && -f "$ROOT/.env" ]]; then
+  METRICS_IMAGE="$(sed -n 's/^METRICS_SERVICE_IMAGE=//p' "$ROOT/.env" | tail -1)"
+fi
 
 args=(--rm --pull "${MNS_IMAGE_PULL_POLICY:-missing}"
       --user "$HOST_UID:$HOST_GID" -e HOME=/tmp)
@@ -102,8 +122,11 @@ args+=(
   -e "MNS_IMAGE_SET=${MNS_IMAGE_SET:-v1}"
   -e "MNS_IMAGE_SET_FILE=$IMAGE_SET_FILE"
   -e "MNS_PACK_STORE_ROOT=$PACK_STORE"
+  # The metrics service image, to judge a headless run once (scoring.judge_once).
+  -e "METRICS_SERVICE_IMAGE=$METRICS_IMAGE"
   -e "MNS_HOST_UID=$HOST_UID" -e "MNS_HOST_GID=$HOST_GID"
 )
+[[ -n "${MNS_SIM_STOP_TIMEOUT:-}" ]] && args+=(-e "MNS_SIM_STOP_TIMEOUT=$MNS_SIM_STOP_TIMEOUT")
 if [[ -n "$KIT" ]]; then
   # The escape hatch for a kit that is not in an image yet: its contract
   # replaces the pinned host's, so the contract variable is not set at all.
@@ -112,6 +135,16 @@ if [[ -n "$KIT" ]]; then
 else
   args+=(-e "MNS_RUNTIME_HOST_COMPATIBILITY_CONTRACT=$CONTRACT")
 fi
+# The image that runs each stack's interface.py (stacks/<id>/interface.py):
+# the catalog pin (images/*.generated.env), or ./.env for a local build.
+INTERFACE_IMAGE="${TEVV_INTERFACE_IMAGE:-$(dotenv_value TEVV_INTERFACE_IMAGE "$ROOT/.env")}"
+[[ -n "$INTERFACE_IMAGE" ]] && args+=(-e "TEVV_INTERFACE_IMAGE=$INTERFACE_IMAGE")
+# Stack settings to take from this shell for one experiment, without editing
+# a generated stack's .env (e.g. MNS_STACKS_PASSENV=POLL_RATE_HZ POLL_RATE_HZ=12).
+# Compose reads them where the stack's .env leaves them unset.
+for name in ${MNS_STACKS_PASSENV:-}; do
+  [[ -n "${!name+x}" ]] && args+=(-e "$name=${!name}")
+done
 case "$PWD/" in "$ROOT"/*) ;; *) args+=(-v "$PWD:$PWD") ;; esac
 
 # Inputs outside the checkout, at their identical paths. --mount (not -v)

@@ -1,0 +1,17 @@
+# A TEVV test suite (tevv.suite.v3), an example to copy: a kind of test, as scenarios run in
+# order. It names no stack: ./tevv suite run <id> --stack <your stack> flies every drone of
+# every scenario on it (tevv-default without --stack).
+schema: tevv.suite.v3
+name: VIO
+description: 'How well a stereo-inertial estimator tracks the vehicle: accuracy on an easy path, robustness to fast
+  motion, and drift over distance. TEVV flies every path; the estimator under test rides along and publishes its
+  estimate.'
+scenarios:
+- scenario: vio-baseline-box
+  purpose: Baseline accuracy on an easy box at 1.5 m/s
+  repeats: 2
+- scenario: vio-aggressive-zigzag
+  purpose: Robustness to fast motion and sharp turns at 3 m/s
+  repeats: 2
+- scenario: vio-long-loop
+  purpose: Drift, heading and scale over three climbing laps (about 140 m)

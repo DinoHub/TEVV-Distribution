@@ -1,12 +1,17 @@
-# MnS Product
+# TEVV
 
-MnS is a containerised simulation environment for testing drone autonomy. You
-author a scenario in ScenarioLab (an Unreal editor), MnS generates a stack from
-it (Unreal + Cosys-AirSim, PX4 or ArduPilot SITL, ROS 2 Humble), and you fly,
-record and evaluate it from a browser dashboard. Everything runs in Docker.
+TEVV is a containerised simulation environment for testing drone autonomy.
+You author a scenario in ScenarioLab (an Unreal editor): the world, the drones
+and each drone's mission. You say who flies each drone with a stack (your
+software and a Python `interface.py` that wires it to TEVV's topics). TEVV
+generates and runs it (Unreal + Cosys-AirSim; SimpleFlight, PX4 or ArduPilot
+per drone; ROS 2 Humble); each stack flies its drone from take-off to
+landing, and TEVV judges each mission. Everything runs in Docker,
+from a terminal or a browser dashboard.
 
-This repository is the customer distribution. Its historical name is
-`M-S-Simulation-Runtime-Stack`, but it holds the whole product, not one stack.
+This repository is the customer distribution (`DinoHub/TEVV-Distribution`;
+its historical name is `M-S-Simulation-Runtime-Stack`): it holds the whole
+product, not one stack.
 
 ## Requirements
 
@@ -15,30 +20,30 @@ This repository is the customer distribution. Its historical name is
 - About 35 GB of free disk for the first setup
 - Google Chrome or Chromium for the dashboard
 - Access to the private `dhdevspace/auto_mns` images (Docker Hub) and the
-  `DinoHub/TEVV-Airsim` pack releases (GitHub). Ask your MnS contact.
+  `DinoHub/TEVV-Airsim` pack releases (GitHub). Ask your TEVV contact.
 
 `./setup.sh` checks each of these and prints the fix for anything missing.
 
 ## Quick start
 
 ```bash
+git clone https://github.com/DinoHub/TEVV-Distribution.git tevv
+cd tevv
 ./setup.sh           # checks the machine, logs in to Docker Hub, pulls the images
 ./download-packs.sh  # downloads the starter levels (logs in to GitHub)
-make dashboard       # then open http://localhost:3001 in Chrome
+./tevv up            # the dashboard: open http://localhost:3001 in Chrome
 ```
 
-From there, the [User Guide](docs/USER_GUIDE.md) walks you from an empty
-scenario to a recorded rosbag. Stop with `make dashboard-down`.
-
-The same flows run without the browser, through the same images:
+Then fly a test from a terminal, or from the dashboard:
 
 ```bash
-make author                                  # ScenarioLab; exports land in scenarios/<name>/
-make fly SCENARIO=<name> RECORD=1            # generate, fly a fixed-length run (FLY_SECONDS, 300), keep the bag
-make campaign CAMPAIGN=vio-reference         # a scored run matrix
+./tevv run scenarios/vio-baseline-box             # TEVV's built-in stack (tevv-default) flies it
+./tevv results vio-baseline-box
+./tevv suite run local-planner --stack my-planner # a kind of test, flown by your stack
 ```
 
-See [Headless](docs/stacks.md).
+To test your own software, write a stack: [docs/interface/](docs/interface/README.md).
+`./tevv help` lists every command. Stop the dashboard with `./tevv down`.
 
 ## Find your way
 
@@ -46,6 +51,7 @@ See [Headless](docs/stacks.md).
 
 | I want to... | Read |
 | --- | --- |
+| test my own planner, estimator or whole stack | [Testing your autonomy](docs/interface/README.md) |
 | go from a fresh clone to my first rosbag | [User Guide](docs/USER_GUIDE.md) |
 | connect my own autonomy stack to a running simulation | [User Guide: connecting your autonomy stack](docs/USER_GUIDE.md#connecting-your-autonomy-stack) |
 | know which ROS 2 topics a stack will publish | [What will this stack publish?](docs/topics.md) |
