@@ -139,7 +139,10 @@ Container(image="me/planner:1",            # required
           env={"MY_SETTING": "1"},
           gpu=True,                         # give it the GPU
           entrypoint=None, working_dir=None,
-          run_as="platform")                # platform: the host user, HOME=/tmp; "image": the image's own user
+          run_as="platform",                # platform: the host user, HOME=/tmp; "image": the image's own user
+          ports=["8080:80", "9000:9000/udp"],          # HOST:CONTAINER, optionally /udp
+          volumes={"engines": "/engines"},              # a named volume that outlives a run
+          fcu=False)                        # a second MAVLink link to the autopilot (see below)
 ```
 
 Every container gets:
@@ -162,6 +165,39 @@ nodes on the wall clock: wrap it in one of your own that sets it for every
 node (`SetParameter(name="use_sim_time", value=True)`, as the examples'
 `files/sim_time.launch.py` do). Wall-clock timers (`create_wall_timer`)
 stay on the wall clock either way.
+
+`ports` publishes a container port on the host, as `"HOST:CONTAINER"` or
+`"HOST:CONTAINER/udp"`. Host ports are 1024 or higher. A stack that
+publishes host ports can be bound to one drone only: two drones' copies of it
+would want the same port, so the generator refuses the second and names the
+port.
+
+`volumes` maps a name to an absolute path inside the container. Each is a named
+Docker volume, `tevv-stack-<stack id>-<name>`, that outlives a run: the place
+for a TensorRT engine cache that takes minutes to build and should not be
+built again on every run. A host path on the left is not accepted (put team
+files in `files/`, which is `/stack/files`), and neither is a path under
+`/stack`, `/shared`, `/cfg` or `/mns/out`, which TEVV mounts itself.
+
+`fcu=True` is accepted but nothing can honour it yet. It would give the
+container its own MAVLink link to the drone's autopilot (so that it could run
+its own MAVROS), and no autopilot offers a second link: PX4's router endpoints
+belong to TEVV and AirSim, and ArduPilot's SITL serves MAVROS on tcp 5760
+only. `stack check` refuses a stack that sets it, and says so. Use TEVV's
+MAVROS topics, `/<drone>/mavros/...`, through the interface instead.
+
+A stack of three containers, two of them on the GPU and sharing a TensorRT
+engine cache:
+
+```python
+containers = {
+    "casio-node": Container(image="me/casio-edge:1"),
+    "detection":  Container(image="me/casio-detection:1", gpu=True,
+                            volumes={"engines": "/engines"}),
+    "da3":        Container(image="me/casio-da3:1", gpu=True,
+                            volumes={"engines": "/engines"}),
+}
+```
 
 ### Parameters
 
@@ -217,6 +253,25 @@ A scenario's observers judge every stack the same way, on what TEVV owns.
 
 With observers in the scenario, your checks join your drone's observer
 scorer; without, your scorer runs on its own after each run.
+
+### Watching outputs of any type
+
+```python
+watch = ["/detections", Watch("/depth/image", min_hz=5)]
+```
+
+A stack's useful outputs are often its own (detections, a depth image), which
+TEVV has no wiring line for, so [the live check](#the-live-check) would have
+nothing to look at. `watch` names outputs of your software, of any type, that
+the check judges: each must be published during the window, and at `min_hz`
+or more when you give one. The check fails, with the reason, when a watched
+topic is never published, is advertised but silent, runs below `min_hz`, or
+has a type the interface image does not have, which you fix by adding its
+package to `messages=`.
+
+`stack wire --watch TOPIC` (repeatable) writes the list for you. Without the
+flag, `interface.py` gets `# could watch:` comment lines for the outputs it
+found, so you can pick.
 
 ### Sim-time lockstep
 
@@ -539,7 +594,12 @@ stop and come back.
    prepare-image printed), waits for its ROS graph to settle (`--timeout S`,
    default 60), and lists each node with the topics it subscribes to and
    publishes, with their types. `--command CMD` says what starts your
-   software when the image's own command is not it. The stack's folder is
+   software when the image's own command is not it, and `--gpu` runs it with
+   the GPU. A stack of several containers names the others with
+   `--also NAME=IMAGE` (with `--also-command NAME=CMD` and `--also-gpu NAME`
+   for that one): every image runs together, as it will in a run, and the
+   discovery records each as a container. The stack's folder is mounted
+   read-only at `/stack` in all of them, so its `files/` is `/stack/files`. The stack's folder is
    made when it is missing. When the discovery did not settle or its
    container exited, or the image differs from the one prepared, `wire`
    still writes `interface.py` but warns you to discover again.
@@ -547,7 +607,10 @@ stop and come back.
 4. **wire** matches the discovered topics to what the rig gives the drone,
    and writes `stacks/<id>/interface.py`: one `forward`, `command_from` or
    `estimate_from` line per match, and a `# not wired:` comment for a topic
-   left over. `--autopilot simpleflight|px4|ardupilot` picks what the drone
+   left over. It writes every container discovery recorded. `--watch TOPIC`
+   (repeatable) adds an output of your software to `watch`
+   ([Watching outputs of any type](#watching-outputs-of-any-type)); without
+   it, `# could watch:` lines list the candidates. `--autopilot simpleflight|px4|ardupilot` picks what the drone
    flies on (default: the stack's current autopilot, else `simpleflight`).
    When you have edited `interface.py` since, `wire` writes
    `interface.proposed.py` beside it instead; `--force` replaces your file.
@@ -566,6 +629,7 @@ changed.
 
 ```
 stacks/<id>/
+  files/                your own files, read by your containers at /stack/files
   rig/
     rig.yaml            the sensors: cameras, IMU, lidar, where they sit on the drone
     fit.json            the fit report: your values, the simulator's, the differences
@@ -604,6 +668,24 @@ at the rate a rig asks for, so a rig with more is refused at this step.
 | `--topic CAMERA=TOPIC` | The topic your software reads that camera on; `imu=TOPIC` for the IMU. Repeatable. It wins over a guess by name when `wire` matches topics. |
 | `--rate CAMERA=HZ` | The rate the camera is forwarded to your software at (`wire` writes it as `max_hz` on that camera's `forward`, and the fit report shows it). Kalibr does not record one, so a camera runs at 30 Hz unless you say so. The live check confirms the rate the simulator actually delivers. Repeatable. |
 | `--imu-mount ROLL,PITCH,YAW` | Where the IMU sits on the drone, in degrees, in the drone's body frame (x forward, y left, z up). It matters on hardware where the IMU is not mounted level and facing forward; without it the IMU is taken to be at the body frame. A camera sits at the IMU's mount composed with Kalibr's `T_imu_cam`. |
+
+If you have ROS `camera_info` files rather than a Kalibr calibration, give
+one per camera, each with where the camera sits on the drone:
+
+```bash
+./tevv stack rig my-stack --camera-info front=siyi_a8.yaml \
+    --camera-mount front=0.15,0,-0.10,0,25,0
+```
+
+`--camera-mount NAME=X,Y,Z,ROLL,PITCH,YAW` is in metres and degrees, in the
+drone's body frame (x forward, y left, z up), right-handed, and a positive
+pitch tilts the camera down: the example above is 0.15 m ahead of the body
+origin, 0.10 m below it and tilted 25 degrees down. A `plumb_bob` camera is
+fitted as radtan (a nonzero `k3` is refused, since the simulator's radtan has
+none), `equidistant` is kept as it is, and `rational_polynomial` is refused.
+A `camera_info` file cannot be combined with a Kalibr chain in one rig. When
+a rig has cameras the simulator cannot render, they are reported first, before
+any problem with the topic or rate names you gave.
 
 ### The fit report: exact or closest
 
@@ -697,7 +779,7 @@ as not checked, with its line, and does not fail the check.
 
 **Pass.** Every input TEVV forwards reached your software at its expected
 rate, and every output `interface.py` wires was published by your software;
-the command and the estimate also reached the drone. The command is not
+the command and the estimate also reached the drone. Every topic in `watch` was published by your software, at its `min_hz` when it sets one. The command is not
 expected when TEVV flies your drone (`follow_waypoints()`), and a status only
 has to be published (it may say nothing during the window). The verdict, the
 images it ran on, the files it checked and the rate of each topic are
@@ -756,6 +838,39 @@ case:
 | `tevv_short` | The simulator delivered an input below half its expected rate, or not at all, or TEVV published nothing on it or could not read its rate. Free the GPU of other simulators and run the check again. |
 | `probe_failed` | TEVV's probe could not run, ended without a result (the error gives its exit code and last lines), or was still running at the end (the interface container may be stuck). Rebuild the interface image, or set `TEVV_INTERFACE_IMAGE` to one that starts, then run the check again. |
 | `refused` | Nothing flew: a built-in stack, a stack that fails `stack check`, a stack on its drone's ROS domain, or a `--seconds` or `--timeout` out of range. |
+
+### Files your containers read
+
+Model weights, launch files and configuration go in the stack's `files/`
+folder, which every container sees read-only at `/stack/files`. Put them there
+by copying into `stacks/<id>/files/`, or upload them on the dashboard's
+Stacks page (the Files panel in Discover, and the Files tab afterwards): a
+file may be up to 4 GiB and is streamed to disk. The dashboard refuses an
+upload while a discovery or a live check of that stack is running. Anything
+that should survive a run but is not yours to ship (a TensorRT engine cache)
+belongs in a `volumes` entry instead.
+
+### A worked example: casio-edge
+
+casio-edge is a detection and depth stack of three containers. Discovery
+brings them up together:
+
+```bash
+./tevv stack discover casio --image me/casio-edge:1 \
+    --also detection=me/casio-detection:1 --also-gpu detection \
+    --also da3=me/casio-da3:1 --also-gpu da3
+./tevv stack rig casio --camera-info front=siyi_a8.yaml \
+    --camera-mount front=0.15,0,-0.10,0,25,0
+./tevv stack wire casio --autopilot px4 --watch /detections --watch /depth/image
+```
+
+`wire` writes the three containers, with `gpu=True` on `detection` and `da3`
+and an `engines` volume on both (add the volume by hand: discovery cannot know
+it), and `watch = ["/detections", "/depth/image"]` so the live check judges
+the two outputs TEVV has no wiring line for. Give `/depth/image` a
+`Watch(..., min_hz=5)` if a slow depth stream should fail the check. The
+camera is the SIYI A8, from its `camera_info` file, mounted 0.15 m ahead and
+0.10 m below the body origin and tilted 25 degrees down.
 
 ### Out of date, and replace
 
