@@ -779,25 +779,59 @@ any problem with the topic or rate names you gave.
 The simulator renders a pinhole camera from a horizontal field of view
 (square pixels, the centre of the image as the principal point, no
 distortion), and its fisheye path takes Kannala-Brandt and double sphere
-calibrations as they are. So your camera is either rendered exactly or by
-the closest thing the simulator can draw, and `stack rig` says which for each
-camera. `rig/fit.json` keeps your values, the simulator's, and the
-differences (simulator minus yours, in pixels).
+calibrations as they are. A camera that does not fit those is not drawn
+as a lookalike. TEVV renders it wider and resamples it to your calibration
+(below). So your camera is either exact or, in a few cases, a closest match,
+and `stack rig` says which for each camera. `rig/fit.json` keeps your values,
+the simulator's, and the differences (simulator minus yours, in pixels).
 
 | Their model | Rendered as | Match |
 |---|---|---|
 | pinhole + equidistant (Kannala-Brandt) | fisheye, Kannala-Brandt series with their coefficients | exact |
 | double sphere | fisheye, double sphere with their xi and alpha | exact |
-| pinhole + radtan (or none), narrower than 90 degrees | pinhole, focal from the mean of fx and fy | closest: fx, fy, centre and distortion differences reported |
-| pinhole + radtan, 90 degrees or wider | fisheye with a tangent series that imitates a pinhole | closest, with the projection error reported |
+| pinhole, square pixels, centred, no distortion | pinhole at your field of view | exact |
+| pinhole + radtan, or fx different from fy, or a principal point more than half a pixel off centre | pinhole rendered wider at your focal length (the smaller of fx and fy), then resampled | exact, by resampling |
+| the same, when the widened render would be 90 degrees or wider | fisheye rendered at the wider view, then resampled | exact, by resampling |
 | omni, eucm | not supported | refused |
 
-`stack rig` refuses a camera of those models (exit 1, naming the camera,
-with the fit of the others; nothing is written); recalibrate with Kalibr's
-pinhole-radtan, pinhole-equi or double sphere (`ds-none`) models. For a
-closest match, read the reported differences before you trust a comparison
-against your real recordings: a distortion the simulator does not draw is a
-real difference in what your software sees.
+**Resampling.** The interface container resamples each frame of such a camera
+to your fx, fy, cx and cy and your radtan distortion, and publishes a
+`camera_info` with your values instead of the simulator's. Your software
+sees the image size and calibration you gave. This is automatic in `forward`;
+`interface.py` does not change. A wide camera such as a ZED is exact too: a
+1280x720 ZED-like camera is rendered as a 1676x946 fisheye of 108 degrees and
+resampled from that. `stack rig` prints what it will do, for example
+`camera left: resampled to your calibration (rendered 1344x768, 87.9 degrees)`
+or `(rendered as a fisheye ...)`.
+
+Resampling costs CPU in the interface container, about 9 ms per frame for
+640x480 on a desktop CPU. The container logs
+`camera <name>: resampling takes N.N ms per frame` every 10 seconds. If a
+frame arrives at a size other than the planned render, it passes through
+unresampled with the simulator's `camera_info`, and the container warns once.
+
+**Closest match.** TEVV refuses the resampling, and the camera stays a
+closest match, when the render would need:
+
+- more than 4096 pixels on a side,
+- more than twice your pixel count,
+- a fisheye field of view over 220 degrees, or
+- a distortion that does not invert at the image corners.
+
+The reason is in the camera's notes, and the summary names the differences,
+for example `closest match: fx differs by +2.0 px, distortion error 3.4 px`.
+Read them before you trust a comparison against your real recordings: a
+distortion the simulator does not draw is a real difference in what your
+software sees.
+
+The fit is shown in `stack rig` and `stack show` (`fit`), in each run's
+`interface.json` (`inputs.cameras[<name>].fit`), and in the dashboard's Rig
+step, Rig tab, Overview and Live check. The
+[live check](#the-live-check) records it per camera.
+
+`stack rig` refuses a camera of the unsupported models (exit 1, naming the
+camera, with the fit of the others; nothing is written); recalibrate with
+Kalibr's pinhole-radtan, pinhole-equi or double sphere (`ds-none`) models.
 
 ### Statuses
 
@@ -873,7 +907,7 @@ was published by your software, at its `min_hz` when it sets one. The command
 is not expected when TEVV flies your drone (`follow_waypoints()`), and a status only
 has to be published (it may say nothing during the window). The verdict, the
 images it ran on, the files it checked and the rate of each topic are
-recorded in `onboarding.json`, and the stack becomes `ready`. Pinning other
+recorded in `onboarding.json` (with each camera's fit under `cameras`; a camera that is only a closest match adds a note, never a failure), and the stack becomes `ready`. Pinning other
 images takes that back (`needs fix`), and so does editing `interface.py` or
 the rig, by hand or with `wire` and `rig` (`not checked`); run the check
 again.
