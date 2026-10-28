@@ -312,7 +312,8 @@ Measured capacity, from one drone to ten stacks flown together, is in
   slot. `participant` (default: the stack's id) names your waits in the logs.
 
 The mission's budgets (take-off, mission, landing) count sim seconds under
-lockstep.
+lockstep, and so do the interface's own timers: TEVV's waypoint follower,
+the hold after a silence in your commands, and the autopilot's waits.
 
 ## setup(): wiring
 
@@ -398,8 +399,8 @@ event. It never flies the drone. Per drone:
    mission ends `error`.
 3. **Mission.** TEVV publishes the points, `control_state` turns
    `external`, and `on_start(d)` is called. Your commands now reach the
-   autopilot through the interface's gate; after 1 s without one, the drone
-   holds.
+   autopilot through the interface's gate; after 1 s without one (1 s of
+   simulation time under lockstep), the drone holds.
 4. **End.** At the first of: every point reached, `done`, an error, the
    time budget, a stop. The gate closes and `on_end(d, reason)` is called.
 5. **Landing.** TEVV calls your `land(d)` step; when it returns, the drone
@@ -814,7 +815,9 @@ fisheye of 108.3 degrees corner to corner and resampled from that. Free, the
 same camera is the closest-match pinhole, and its summary says
 "(resampled to your calibration under lockstep)": the fisheye route is too slow
 to deliver the camera's rate without lockstep. Rig fisheye renders use the
-shared cubemap, one per mount point. `stack rig` prints what
+shared cubemap, one per mount point. A rig fisheye flown free on the shared
+cubemap has not been measured on this release, so no rate is given for it.
+`stack rig` prints what
 it will do, for example
 `camera left: resampled to your calibration (rendered 1344x768, 87.9 degrees across)`
 or `(rendered as a fisheye 1676x946, 108.3 degrees corner to corner)`. A
@@ -867,6 +870,10 @@ and the dashboard's Stacks page shows the same word.
 
 A stack you onboard stays `not checked` until you run
 [the live check](#the-live-check).
+
+A stack's `ready` is for the mode it was checked in, free or
+[in lockstep](#the-live-check-in-lockstep). A stack checked only in lockstep
+is not shown to deliver its camera rate in free runs.
 
 ### The live check
 
