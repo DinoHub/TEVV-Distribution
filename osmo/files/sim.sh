@@ -82,8 +82,10 @@ fi
 # Same flags the generated stack uses, with the window swapped for
 # off-screen rendering: a pod has no X server. Never -NullRHI, which
 # skips rendering and takes the cameras with it.
+# -ExecCmds separates commands with commas (UE ParseExecCommands.cpp); with
+# semicolons the whole string is one command and only r.RayTracing is touched.
 exec /app/TEVVRuntimeHost/TEVVRuntimeHost.sh \
   -RenderOffScreen -NoSound -Unattended -NoSplash \
   -NoRayTracing \
-  -ExecCmds='r.RayTracing 0;r.RayTracing.ForceAllRayTracingEffects 0;r.Lumen.HardwareRayTracing 0' \
+  -ExecCmds='r.RayTracing 0,r.RayTracing.ForceAllRayTracingEffects 0,r.Lumen.HardwareRayTracing 0' \
   -settings="$R/settings.json" "${SCENARIO_ARGS[@]}"
