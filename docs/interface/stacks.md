@@ -349,7 +349,7 @@ the full catalog is in [topics.md](topics.md).
 | --- | --- |
 | `forward(src, "/topic", convert=fn, frame_id=..., encoding=..., max_hz=...)` | Republish an input on your side. `convert` turns each message into anything (any type). A camera also publishes its `camera_info` (beside the image, or `info=`). |
 | `forward(self.stereo, left="/cam0/image_raw", right="/cam1/image_raw")` | Both cameras of a pair. |
-| `on(src, callback)` | Your function gets each message (a pair gets `callback(left, right)`). |
+| `on(src, callback)` | Your function gets each message (a pair gets `callback(left, right)`). An exact camera's frames arrive resampled, as `forward` publishes them. |
 | `subscribe("/topic", MsgType, callback)` / `publisher("/topic", MsgType)` | Your own topics on your side. |
 | `command_from("/topic", type=None, frame="ENU", convert=fn)` | Your command, sent to TEVV. `PositionTarget`, `Twist(Stamped)` (`frame="FLU"` for body velocities), `PoseStamped` or `Odometry`; the type is found from the topic. |
 | `send_position(x, y, z, yaw=None)` / `send_velocity(vx, vy, vz, yaw_rate=None, frame="world")` / `send_command(msg)` | Fly from your own code. |
@@ -719,7 +719,7 @@ stacks/<id>/
   files/                your own files, read by your containers at /stack/files
   rig/
     rig.yaml            the sensors: cameras, IMU, lidar, where they sit on the drone
-    fit.json            the fit report: your values, the simulator's, the differences
+    fit.json            the fit report: your values, the simulator's, the differences (kept current from rig.yaml)
     kalibr-*.yaml       the Kalibr files you gave, copied beside it
   onboarding.json       what onboarding did so far
 ```
@@ -783,13 +783,17 @@ calibrations as they are. A camera that does not fit those is not drawn
 as a lookalike. TEVV renders it wider and resamples it to your calibration
 (below). So your camera is either exact or, in a few cases, a closest match,
 and `stack rig` says which for each camera. `rig/fit.json` keeps your values,
-the simulator's, and the differences (simulator minus yours, in pixels).
+the simulator's, and the differences (simulator minus yours, in pixels). TEVV
+fits the rig again each time it generates a stack or shows the fit, so what you
+see is what runs; `fit.json` is rewritten when it differs (after a TEVV update
+that fits a camera differently, or when it is missing or damaged).
 
 | Their model | Rendered as | Match |
 |---|---|---|
 | pinhole + equidistant (Kannala-Brandt) | fisheye, Kannala-Brandt series with their coefficients | exact |
 | double sphere | fisheye, double sphere with their xi and alpha | exact |
-| pinhole, square pixels, centred, no distortion | pinhole at your field of view | exact |
+| pinhole, square pixels, centred, no distortion, under 90 degrees across | pinhole at your field of view | exact |
+| the same at 90 degrees across or wider (the simulator's pinhole stops below 90) | fisheye whose Kannala-Brandt series is the pinhole's, then resampled | exact, by resampling |
 | pinhole + radtan, or fx different from fy, or a principal point more than half a pixel off centre | pinhole rendered wider at your focal length (the smaller of fx and fy), then resampled | exact, by resampling |
 | the same, when the widened render would be 90 degrees or wider | fisheye rendered at the wider view, then resampled | exact, by resampling |
 | omni, eucm | not supported | refused |
@@ -797,15 +801,19 @@ the simulator's, and the differences (simulator minus yours, in pixels).
 **Resampling.** The interface container resamples each frame of such a camera
 to your fx, fy, cx and cy and your radtan distortion, and publishes a
 `camera_info` with your values instead of the simulator's. Your software
-sees the image size and calibration you gave. This is automatic in `forward`;
-`interface.py` does not change. A wide camera such as a ZED is exact too: a
-1280x720 ZED-like camera is rendered as a 1676x946 fisheye of 108 degrees and
-resampled from that. `stack rig` prints what it will do, for example
-`camera left: resampled to your calibration (rendered 1344x768, 87.9 degrees)`
-or `(rendered as a fisheye ...)`.
+sees the image size and calibration you gave. This is automatic in `forward`
+and in `on` (your callback gets the resampled frame, and a pair gets both
+resampled); `interface.py` does not change. A wide camera such as a ZED is
+exact too: a 1280x720 ZED-like camera is rendered as a 1676x946 fisheye of
+108.3 degrees corner to corner and resampled from that. `stack rig` prints what
+it will do, for example
+`camera left: resampled to your calibration (rendered 1344x768, 87.9 degrees across)`
+or `(rendered as a fisheye 1676x946, 108.3 degrees corner to corner)`. A
+pinhole render's field of view is measured across the image; a fisheye
+render's from corner to corner, as the simulator's fisheye takes it.
 
-Resampling costs CPU in the interface container, about 9 ms per frame for
-640x480 on a desktop CPU. The container logs
+Resampling costs CPU in the interface container, about 13 ms per frame for a
+640x480 camera (measured in a live check). The container logs
 `camera <name>: resampling takes N.N ms per frame` every 10 seconds. If a
 frame arrives at a size other than the planned render, it passes through
 unresampled with the simulator's `camera_info`, and the container warns once.
@@ -820,6 +828,9 @@ closest match, when the render would need:
 
 The reason is in the camera's notes, and the summary names the differences,
 for example `closest match: fx differs by +2.0 px, distortion error 3.4 px`.
+The distortion error is the larger of your distortion the simulator does not
+draw and, for a camera 90 degrees or wider, how far the fisheye render lands
+from a true pinhole at the image corners.
 Read them before you trust a comparison against your real recordings: a
 distortion the simulator does not draw is a real difference in what your
 software sees.
@@ -909,7 +920,8 @@ has to be published (it may say nothing during the window). The verdict, the
 images it ran on, the files it checked and the rate of each topic are
 recorded in `onboarding.json` (with each camera's fit under `cameras`; a camera that is only a closest match adds a note, never a failure), and the stack becomes `ready`. Pinning other
 images takes that back (`needs fix`), and so does editing `interface.py` or
-the rig, by hand or with `wire` and `rig` (`not checked`); run the check
+the rig, by hand or with `wire` and `rig`, or a TEVV update that fits a camera
+differently (exact or closest, resampled or not) (`not checked`); run the check
 again.
 
 **Fail (exit 1).** The verdict is recorded with one reason per problem, each
