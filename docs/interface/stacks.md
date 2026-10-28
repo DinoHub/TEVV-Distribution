@@ -270,9 +270,11 @@ topic is never published, is advertised but silent, runs below `min_hz`, or
 has a type the interface image does not have, which you fix by adding its
 package to `messages=`.
 
-`stack wire --watch TOPIC` (repeatable) writes the list for you. Without the
-flag it writes the list empty, so name every topic again when you wire again
-(the dashboard's Wire step sends the stack's own list), and `interface.py`
+`stack wire --watch TOPIC` (repeatable) writes the list for you, and
+`--watch TOPIC=HZ` writes `Watch(TOPIC, min_hz=HZ)`. Without the flag it
+writes the list empty, so name every topic again, with its rate, when you
+wire again (the dashboard's Wire step sends the stack's own list and rates),
+and `interface.py`
 gets `# could watch:` comment lines for the outputs it found, so you can pick.
 
 ### Sim-time lockstep
@@ -594,8 +596,8 @@ stop and come back.
    builds.
 2. **discover** starts the image (`--image IMAGE`, required: the image
    prepare-image printed), waits for its ROS graph to settle (unchanged for
-   `--settle S` seconds, 1 to 600, default 5, within `--timeout S`, default
-   60), and lists each node with the topics it subscribes to and
+   `--settle S` seconds, 1 to 600, default 5, waited on top of `--timeout S`,
+   default 60, the time its nodes may take to appear), and lists each node with the topics it subscribes to and
    publishes, with their types. `--command CMD` says what starts your
    software when the image's own command is not it, and `--gpu` runs it with
    the GPU. A stack of several containers names the others with
@@ -620,7 +622,7 @@ stop and come back.
    `run_as="image"`: discover runs them as the image's own user, so that is
    what it proved works (under the default, `platform`, the host user with
    `HOME=/tmp`, an image that writes to its own folders fails). `--watch TOPIC`
-   (repeatable) adds an output of your software to `watch`
+   (repeatable; `TOPIC=HZ` with the lowest rate you accept) adds an output of your software to `watch`
    ([Watching outputs of any type](#watching-outputs-of-any-type)); without
    it, `# could watch:` lines list the candidates.
    `--autopilot simpleflight|px4|ardupilot` picks what the drone
