@@ -85,9 +85,11 @@ own drone.
 ## The declarations (class attributes)
 
 TEVV reads these **without running your file**, so write them as plain
-values: strings, lists, dicts, `Container(...)`, `Autopilot(...)` and
-`Network(...)` with plain arguments. An expression (`os.environ[...]`, a function call) is
-refused with the line that has it.
+values: strings, lists, dicts, `Container(...)`, `Autopilot(...)`,
+`Network(...)`, `Parameter(...)`, `Messages(...)`, `Scoring(...)` and
+`Lockstep(...)` with plain arguments. An expression (`os.environ[...]`, a
+function call, an f-string, a module constant) is refused with the line that
+has it.
 
 | Attribute | Default | What |
 | --- | --- | --- |
@@ -98,6 +100,10 @@ refused with the line that has it.
 | `ready` | `[]` | Topics on your side that TEVV waits for, after take-off, before the mission starts (up to 240 s). |
 | `drones` | `"one"` | `"one"`: an instance flies one drone (a test naming it for two drones runs it twice). `"many"`: one instance flies every drone a test gives it ([below](#one-stack-many-drones)). |
 | `network` | `None` | `Network("<docker network>", domain=<ROS_DOMAIN_ID>)`: a stack you start yourself, in your own Docker network; declare no `containers` ([below](#a-stack-you-start-yourself)). |
+| `parameters` | `{}` | `name: Parameter(default, ...)`: settings a test sets or sweeps ([below](#parameters)). |
+| `messages` | `[]` | `Messages(image, packages=[...])`: your own ROS message types ([below](#your-own-message-types)). |
+| `scoring` | `None` | `Scoring(plan=..., checks={...})`: your plan's freshness and your own pass/fail limits ([below](#scoring-your-own-outputs)). |
+| `lockstep` | `None` | `Lockstep(ack_on=... \| status_topic=..., timeout_ms=...)`: the simulation waits for your stack ([below](#sim-time-lockstep)). |
 
 ### Choosing an autopilot
 
@@ -151,7 +157,92 @@ Every container gets:
   `ROS_DOMAIN_ID` or `CYCLONEDDS_URI`.
 
 Use sim time (`use_sim_time: true`); `/clock`, `/tf` and `/tf_static` are
-always on your side.
+always on your side. A launch file that declares no `use_sim_time` runs its
+nodes on the wall clock: wrap it in one of your own that sets it for every
+node (`SetParameter(name="use_sim_time", value=True)`, as the examples'
+`files/sim_time.launch.py` do). Wall-clock timers (`create_wall_timer`)
+stay on the wall clock either way.
+
+### Parameters
+
+```python
+parameters = {
+    "v_max": Parameter(2.0, min=0.5, max=5.0, unit="m/s", label="Top speed"),
+    "mode": Parameter("cautious", options=["cautious", "bold"]),
+}
+containers = {"planner": Container(image="me/planner:1",
+                                   command="ros2 launch p p.launch.py v_max:={param.v_max}")}
+```
+
+A parameter's default sets its type (number, whole number, true/false or
+text); `min`/`max` bound a number, `options` lists the allowed values, and
+`label`, `unit` and `help` describe it in the dashboard. `{param.<name>}` in a
+container's `command` or `env` is the run's value, and `setup()` reads it as
+`self.params["v_max"]`. A test sets values, or a test plan sweeps them, under
+`extensions."mns.parameters".components.<stack id>`; a value out of bounds is
+refused before the run.
+
+### Your own message types
+
+```python
+messages = [Messages("me/planner:1", packages=["planner_msgs"],
+                     setup=["/ws/install/setup.bash"])]
+```
+
+TEVV copies the named packages out of the image once per run, so the
+recorder, the viewer and your interface container know them: `setup()` can
+import them, and a `Scoring(plan=...)` or `Lockstep(ack_on=...)` topic can be
+of your own type. `setup` names setup.bash files to source in that image when
+the packages live outside the usual workspaces (`/ros2_ws`, `/ws`,
+`/workspace`).
+
+### Scoring your own outputs
+
+```python
+scoring = Scoring(plan="/planner_state",
+                  checks={"replan_interval_max_s": {"max": 2.0}})
+```
+
+A scenario's observers judge every stack the same way, on what TEVV owns.
+`scoring` adds what only your stack can say:
+
+- `plan`: a topic on your side your planner publishes once per new plan
+  (any type). TEVV records when each arrives and reports the time between
+  plans (`replan_interval_p50_s`, `_p95_s`, `_max_s`). Only for a stack that
+  flies its drone.
+- `checks`: pass/fail limits on the scorer's metrics, `{metric: {"min"|"max":
+  limit}}`: a planner's when your stack flies (`goal_success_rate`,
+  `min_clearance_m`, `replan_interval_max_s`, ...), an estimator's when it
+  only estimates (`ate_rmse_m`, `availability`, ...).
+
+With observers in the scenario, your checks join your drone's observer
+scorer; without, your scorer runs on its own after each run.
+
+### Sim-time lockstep
+
+```python
+lockstep = Lockstep(ack_on="/planner_state", timeout_ms=10000)
+```
+
+Under sim-time lockstep (a lockstep camera, or `conditions.lockstep.grid_hz`
+in the scenario) the simulation holds time at each slot until your stack has
+caught up, so a slow step costs wall time, never flight time. Outside
+lockstep the declaration does nothing.
+
+- `ack_on`: a topic on your side that goes quiet while your software is busy
+  (say, blocked in a replan) and keeps publishing when it is idle. Any message
+  there tells TEVV your stack has caught up with the latest sim time. A
+  planner's trajectory topic is often the wrong choice: it is quiet between
+  goals, so every slot then waits the whole timeout. A heartbeat timer in the
+  same callback group as the replan is usually right.
+- `status_topic`: instead, one `std_msgs/Header` per camera frame your
+  software is done with (stamp: the frame's; `frame_id`: `processed`,
+  `skipped` or `failed`), for an estimator.
+- `timeout_ms` (default 2000): the longest the simulation waits for you at one
+  slot. `participant` (default: the stack's id) names your waits in the logs.
+
+The mission's budgets (take-off, mission, landing) count sim seconds under
+lockstep.
 
 ## setup(): wiring
 
@@ -397,6 +488,52 @@ comparable between stacks.
   reason in the results and the traceback in the log. The other drones fly
   on.
 - **Python packages.** `requirements.txt` is installed into the interface
-  container when it starts.
+  container when it starts, from the wheels `./tevv stack lock` downloaded
+  ([below](#pinning-a-stack)): lock it after each change.
 - **Your editor.** `./tevv sdk` copies the SDK (the version TEVV runs) into
   `.tevv/sdk`; add it to your editor's Python path for autocomplete.
+
+## Pinning a stack
+
+```bash
+./tevv stack lock my-planner
+```
+
+writes `stacks/my-planner/tevv.lock`: every image the stack declares
+(containers and message types) by its registry digest, so a tag that moves
+cannot change a rerun; and, when there is a `requirements.txt`, its packages
+downloaded as wheels inside the image that runs `interface.py`
+(`wheels/`), each pinned by hash in `requirements.lock`. A run then starts
+each locked image by digest and installs only those wheels, offline, checking
+every hash. An image the lock does not name runs by its tag, and `stack
+check` warns; a `requirements.txt` that is not locked, or changed since, is
+refused. Lock again after changing an image tag or a requirement, and commit
+the lock with the stack.
+
+## From a component.yaml
+
+```bash
+./tevv stack import path/to/components/my-planner --id my-planner
+```
+
+writes `stacks/my-planner/interface.py` from a v1.1 component package and
+copies its files beside it (`/cfg/component/...` becomes `/stack/...`). The
+containers, needs, autopilot, ready topics, estimate, parameters, message
+types, scoring and lockstep carry over as declarations. What a component did
+differently is listed as a TODO in the file:
+
+- a component read the bridge's topics directly; your containers now run on
+  their own domain, so `setup()` forwards each input under the name your
+  software reads. Names the component.yaml gives (its adaptor inputs, the
+  ground truth and goal a planner reads) are filled in; the others are TODO
+  lines.
+- a planner that published MAVROS setpoints itself now hands them to TEVV
+  (`command_from`).
+- a `record:` list: TEVV records your command, estimate and plan itself;
+  publish anything else with `self.debug(...)`.
+- one-shot services and start order: your containers start together.
+
+`examples/stacks/` holds three finished imports: `openvins` (an estimator
+TEVV flies for), `super` and `mighty` (local planners, both lockstep
+participants). Copy one into `stacks/` to use it; `examples/tests/` holds tests
+that fly SUPER and MIGHTY on `planner-lockstep-xfs` (copy into `tests/`).

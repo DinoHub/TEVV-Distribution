@@ -1,0 +1,10 @@
+# SUPER flies the yard slalom (scenarios/planner-lockstep-xfs) under sim-time
+# lockstep. Copy into tests/ (and examples/stacks/super into stacks/); the
+# dashboard's Run step then lists it, or:  ./tevv campaign run tests/planner-lockstep-super.yaml
+schema: tevv.test.v1
+name: SUPER on the yard slalom
+description: SUPER (examples/stacks/super) flies Drone1's slalom, a lockstep participant on /planner_state.
+scenario: planner-lockstep-xfs
+drones:
+  Drone1: super
+repeats: 1
