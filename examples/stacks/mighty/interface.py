@@ -47,12 +47,15 @@ class Mighty(Interface):
     }
     ready = ["/NX01/point_current_state"]
     # MIGHTY's trajectory and goal types, for the recorder, the viewer and this interface.
+    # Messages names the published image (no Cyclone DDS): it only reads the packages' types
+    # from it. The container above runs the -cyclone image, a second pin to keep in step.
     messages = [Messages("dhdevspace/auto_mns:mighty_algo_only", packages=["dynus_interfaces"],
                          setup=["/workspace/generated/mighty/.planner_ws/ros_ws/install/setup.bash"])]
     scoring = Scoring(plan="/NX01/point_A", checks={"replan_interval_max_s": {"max": 2.0}})
     lockstep = Lockstep(ack_on="/NX01/point_A", timeout_ms=1000, participant="mighty")
 
     def setup(self):
+        # Copter1 is the check scenario's drone (planner-lockstep-xfs); rename for another scenario.
         self.forward(self.point_cloud, "/Copter1/registered_point_cloud")
         self.forward(self.gt_odom, "/ground_truth/odom")
         self.forward(self.next_waypoint, "/goal")

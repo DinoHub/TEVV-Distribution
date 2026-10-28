@@ -16,6 +16,9 @@ cp -r examples/stacks/super stacks/
 | `super` | SUPER local planner, ArduPilot | Lockstep participant on `/planner_state`; on sim time through `files/sim_time.launch.py`. |
 | `mighty` | MIGHTY local planner, ArduPilot | Lockstep participant on `/NX01/point_A`; carries the position + velocity adaptor in `files/overlay/` until its image is rebuilt with it. |
 
+The stacks name the topics of the check scenario's drone (`Drone1`, `Copter1`) in
+their `interface.py`; to fly them on a scenario with other drone names, edit those lines.
+
 Every container of a stack runs on Cyclone DDS, so its image needs
 `ros-humble-rmw-cyclonedds-cpp`. The published OpenVINS, SUPER and MIGHTY images
 do not have it: `images/` holds the one-line Dockerfiles that add it, and the stacks
@@ -31,7 +34,10 @@ docker build -t dhdevspace/auto_mns:vio-estimator-openvins-69488123-cyclone -f e
 
 A test (`tests/<id>.yaml`) says which stack flies each drone of a scenario;
 the dashboard's Run step lists the tests in `tests/`, which TEVV does not track
-either. `tests/` here holds tests that fly the stacks above:
+either. `examples/tests/` holds tests that fly the stacks above. No test or
+scenario ships for `openvins` yet: the OpenVINS scenarios under `scenarios/`
+attach its component package, not this stack. To fly it, write a test of your
+own on a scenario whose drone carries a stereo pair and an IMU.
 
 | Test | Scenario | Who flies |
 | --- | --- | --- |

@@ -49,6 +49,7 @@ class Super(Interface):
     lockstep = Lockstep(ack_on="/planner_state", timeout_ms=10000, participant="super")
 
     def setup(self):
+        # Copter1 is the check scenario's drone (planner-lockstep-xfs); rename for another scenario.
         self.forward(self.point_cloud, "/Copter1/registered_point_cloud")
         self.forward(self.gt_odom, "/ground_truth/odom")
         self.forward(self.next_waypoint, "/goal")
