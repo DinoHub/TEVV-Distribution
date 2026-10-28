@@ -143,8 +143,15 @@ Container(image="me/planner:1",            # required
           run_as="platform",                # platform: the host user, HOME=/tmp; "image": the image's own user
           ports=["8080:80", "9000:9000/udp"],          # HOST:CONTAINER, optionally /udp
           volumes={"engines": "/engines"},              # a named volume that outlives a run
+          once=False,                       # an init step: runs once, done at exit 0, never restarted
           fcu=False)                        # a second MAVLink link to the autopilot (see below)
 ```
+
+`once=True` marks an init step, such as a container that downloads a model or
+builds an engine into a volume and then exits: TEVV does not restart it, and
+the live check does not count its clean exit as a crash. Discover accepts an
+extra container that exits 0 while the main one keeps running, and `stack
+wire` writes `once=True` for it.
 
 Every container gets:
 
