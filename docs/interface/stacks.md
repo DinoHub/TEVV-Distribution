@@ -102,6 +102,7 @@ has it.
 | `network` | `None` | `Network("<docker network>", domain=<ROS_DOMAIN_ID>)`: a stack you start yourself, in your own Docker network; declare no `containers` ([below](#a-stack-you-start-yourself)). |
 | `parameters` | `{}` | `name: Parameter(default, ...)`: settings a test sets or sweeps ([below](#parameters)). |
 | `messages` | `[]` | `Messages(image, packages=[...])`: your own ROS message types ([below](#your-own-message-types)). |
+| `watch` | `[]` | Outputs of your software, of any type, for [the live check](#the-live-check) to judge: topics, or `Watch(topic, min_hz=...)` ([below](#watching-outputs-of-any-type)). |
 | `scoring` | `None` | `Scoring(plan=..., checks={...})`: your plan's freshness and your own pass/fail limits ([below](#scoring-your-own-outputs)). |
 | `lockstep` | `None` | `Lockstep(ack_on=... \| status_topic=..., timeout_ms=...)`: the simulation waits for your stack ([below](#sim-time-lockstep)). |
 
@@ -173,7 +174,7 @@ would want the same port, so the generator refuses the second and names the
 port.
 
 `volumes` maps a name to an absolute path inside the container. Each is a named
-Docker volume, `tevv-stack-<stack id>-<name>`, that outlives a run: the place
+Docker volume, `tevv-stack-<stack id>_<name>`, that outlives a run: the place
 for a TensorRT engine cache that takes minutes to build and should not be
 built again on every run. A host path on the left is not accepted (put team
 files in `files/`, which is `/stack/files`), and neither is a path under
@@ -596,11 +597,14 @@ stop and come back.
    builds.
 2. **discover** starts the image (`--image IMAGE`, required: the image
    prepare-image printed), waits for its ROS graph to settle (unchanged for
-   `--settle S` seconds, 1 to 600, default 5, waited on top of `--timeout S`,
-   default 60, the time its nodes may take to appear), and lists each node with the topics it subscribes to and
-   publishes, with their types. `--command CMD` says what starts your
+   `--settle S` seconds), and lists each node with the topics it subscribes
+   to and publishes, with their types. discover makes the stack's folder when it is
+   missing. `--timeout S` (default 60) is the
+   time its nodes may take to appear; `--settle` (1 to 600, default 5) is
+   waited on top of it. `--command CMD` says what starts your
    software when the image's own command is not it, and `--gpu` runs it with
-   the GPU. A stack of several containers names the others with
+   the GPU. `--name NAME` names your main container in `interface.py`
+   (default: the stack id; the Container name field in the dashboard). A stack of several containers names the others with
    `--also NAME=IMAGE` (with `--also-command NAME=CMD` and `--also-gpu NAME`
    for that one): every image runs together, as it will in a run, and the
    discovery records each as a container. The stack's folder is mounted
@@ -614,7 +618,7 @@ stop and come back.
    When a container stops before discovery finishes, discover says what its
    exit code means and what to do
    ([When discover stops short](#when-discover-stops-short)).
-   The stack's folder is made when it is missing. When the discovery did not settle or its
+   When the discovery did not settle or its
    container exited, or the image differs from the one prepared, `wire`
    still writes `interface.py` but warns you to discover again.
 3. **rig** describes the sensors your drone carries (below).
@@ -630,6 +634,14 @@ stop and come back.
    it, `# could watch:` lines list the candidates.
    `--autopilot simpleflight|px4|ardupilot` picks what the drone
    flies on (default: the stack's current autopilot, else `simpleflight`).
+   `--ready TOPIC` (repeatable, absolute) writes `ready = [...]`: topics of
+   your software that must publish before TEVV hands it the drone; without
+   the flag `ready` is empty (the Ready checkboxes in the dashboard's Wire
+   step). `--command CMD` and `--also-command NAME=CMD` set what a container
+   runs in a test when that differs from what discovery ran: for example
+   MIGHTY is discovered with a command that starts it directly, and flown
+   with the same command behind a take-off gate (the "What each container
+   runs in a test" fields in the Wire step).
    When you have edited `interface.py` since, `wire` writes
    `interface.proposed.py` beside it instead; `--force` replaces your file.
 5. **lock** is [Pinning a stack](#pinning-a-stack).
@@ -637,9 +649,10 @@ stop and come back.
    ([The live check](#the-live-check)).
 
 Your software keeps its own topic names; `interface.py` is the only place
-that knows both sides. Onboarding takes an id of your own: `discover`, `rig`
-and `wire` refuse the built-in stacks' ids (`tevv-default`,
-`tevv-default-px4`, `tevv-default-ardupilot`). Writing a rig or
+that knows both sides. Onboarding takes an id of your own: `discover`, `rig`,
+`wire`, `prepare-image` (with an id), `lock`, `replace` and `live-check`
+refuse the built-in stacks' ids (`tevv-default`, `tevv-default-px4`,
+`tevv-default-ardupilot`). Writing a rig or
 `interface.py` clears the stack's live check, since what was checked has
 changed.
 
@@ -787,7 +800,7 @@ and the dashboard's Stacks page shows the same word.
 | Status | What makes it |
 | --- | --- |
 | ready | The live check passed, the images it ran on are the ones the stack pins now, `interface.py` and `rig/rig.yaml` are the files it checked, and `stack check` finds nothing wrong. |
-| needs fix | The live check failed, a different image is pinned since it passed, or `stack check` finds a problem (a stack that fails `stack check` needs a fix whatever its live check said). |
+| needs fix | A live check of the current `interface.py` and rig failed, a different image is pinned since it passed, or `stack check` finds a problem. Without such a live check the stack is `not checked`, whatever `stack check` says. |
 | out of date | An image the stack pins has moved: a newer image sits under the same tag. This wins over the other three. |
 | not checked | No live check has been recorded, or `interface.py` or `rig/rig.yaml` changed since it ran (an edit by hand counts: what was checked is no longer what would fly). Every stack you onboard starts here. |
 
@@ -817,18 +830,18 @@ records nothing else and scores nothing.
 
 | Flag | What |
 | --- | --- |
-| `--seconds S` | How long the topics are watched once the drone is handed to your stack (default 30). It cannot be longer than the check mission (150 s). |
+| `--seconds S` | How long the topics are watched once the drone is handed to your stack (default 20). It cannot be longer than the check mission (150 s). |
 | `--timeout S` | How long the check flight may run before it fails. By default it is what a campaign allows the check mission: about 990 s, and 20 times that when your stack runs sim-time lockstep (the simulation then runs slower than the clock on the wall). Give a number above 0 to use another. |
 | `--keep` | Leave the check stack running afterwards, the simulator included, to look at its logs (the probe may still be running in its interface container). |
 | `--progress FILE` | Append the check's progress to FILE as JSON lines, the same `run.phase` events a campaign's runs write (`run_key` is `live-check-<id>`), plus the phase `watching` when TEVV starts watching the topics (its `detail` says whether from the hand-over or on the ground). A stop file in FILE's folder (`campaign.stop`, the marker that stops a campaign's run) stops the check: it ends as not judged (`flight_failed`, "stopped by the user") and records nothing. |
 
-The check stack is generated into `generated/live-check/<id>` in your
-workspace, and stopped at the end unless `--keep`. To read its logs, or stop
-one you kept:
+The check stack is generated into `<workspace>/generated/live-check/<id>`
+(your workspace folder), and stopped at the end unless `--keep`. To read its
+logs, or stop one you kept, give that full path:
 
 ```bash
-make stacks ARGS="logs --stack generated/live-check/my-stack"
-make stacks ARGS="stop --stack generated/live-check/my-stack"
+make stacks ARGS="logs --stack <workspace>/generated/live-check/my-stack"
+make stacks ARGS="stop --stack <workspace>/generated/live-check/my-stack"
 ```
 
 Run it on a machine whose GPU is free: the simulator renders your cameras,
@@ -836,7 +849,9 @@ and one that is starved of the GPU delivers them too slowly to judge.
 
 **What is expected.** An input is expected at its rig rate, capped by the
 `max_hz` on its `forward` line when that is lower (`max_hz` alone when the
-rig gives no rate; any rate above zero when neither does). Under sim-time
+rig gives no rate; any rate above zero when neither does). An input passes at
+half the rate asked or more; one that passes but is below 90% of it says
+"slower than asked (N%)" in its reason. Under sim-time
 lockstep rates are counted per second of simulation time, which is what your
 sensors run on. A topic written as an f-string on `self.drone` alone
 (`f"/{self.drone}/mavros/setpoint_raw/local"`) is read for the check's drone,
@@ -910,6 +925,13 @@ case:
 | `probe_failed` | TEVV's probe could not run, ended without a result (the error gives its exit code and last lines), or was still running at the end (the interface container may be stuck). Rebuild the interface image, or set `TEVV_INTERFACE_IMAGE` to one that starts, then run the check again. |
 | `refused` | Nothing flew: a built-in stack, a stack that fails `stack check`, a stack on its drone's ROS domain, or a `--seconds` or `--timeout` out of range. |
 
+### Deleting a stack
+
+The dashboard can delete a workspace stack: Delete stack on the stack's tabs,
+or Delete on its card in the wizard. You type the stack's id to confirm. It
+refuses built-in stacks, and any stack while a job, an upload or a live check
+is running. The stack's folder goes; the live check's recordings are kept.
+
 ### Files your containers read
 
 Model weights, launch files and configuration go in the stack's `files/`
@@ -936,8 +958,8 @@ brings them up together:
 ```
 
 The detector builds its TensorRT engine for about 20 s before its node
-starts, so `--settle 30` waits for it; with the default 5 s its `/detections`
-is missing from the graph.
+starts. `--settle 30` waits for it. With the default 5 s, `/detections` is
+missing from the graph.
 
 `wire` writes the three containers, the main one keyed `casio` after the
 stack id, all with `run_as="image"` and `gpu=True` on `detection` and `da3`,
