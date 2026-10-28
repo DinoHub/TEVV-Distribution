@@ -191,11 +191,11 @@ engine cache:
 
 ```python
 containers = {
-    "casio-node": Container(image="me/casio-edge:1"),
-    "detection":  Container(image="me/casio-detection:1", gpu=True,
-                            volumes={"engines": "/engines"}),
-    "da3":        Container(image="me/casio-da3:1", gpu=True,
-                            volumes={"engines": "/engines"}),
+    "casio-node": Container(image="dhdevspace/auto_mns:casio-node"),
+    "detection":  Container(image="dhdevspace/auto_mns:casio-detection",
+                            gpu=True, volumes={"engines": "/engines"}),
+    "da3":        Container(image="dhdevspace/auto_mns:casio-da3",
+                            gpu=True, volumes={"engines": "/engines"}),
 }
 ```
 
@@ -599,8 +599,8 @@ stop and come back.
    `--also NAME=IMAGE` (with `--also-command NAME=CMD` and `--also-gpu NAME`
    for that one): every image runs together, as it will in a run, and the
    discovery records each as a container. The stack's folder is mounted
-   read-only at `/stack` in all of them, so its `files/` is `/stack/files`. The stack's folder is
-   made when it is missing. When the discovery did not settle or its
+   read-only at `/stack` in all of them, so its `files/` is `/stack/files`.
+   The stack's folder is made when it is missing. When the discovery did not settle or its
    container exited, or the image differs from the one prepared, `wire`
    still writes `interface.py` but warns you to discover again.
 3. **rig** describes the sensors your drone carries (below).
@@ -610,7 +610,8 @@ stop and come back.
    left over. It writes every container discovery recorded. `--watch TOPIC`
    (repeatable) adds an output of your software to `watch`
    ([Watching outputs of any type](#watching-outputs-of-any-type)); without
-   it, `# could watch:` lines list the candidates. `--autopilot simpleflight|px4|ardupilot` picks what the drone
+   it, `# could watch:` lines list the candidates.
+   `--autopilot simpleflight|px4|ardupilot` picks what the drone
    flies on (default: the stack's current autopilot, else `simpleflight`).
    When you have edited `interface.py` since, `wire` writes
    `interface.proposed.py` beside it instead; `--force` replaces your file.
@@ -779,8 +780,9 @@ as not checked, with its line, and does not fail the check.
 
 **Pass.** Every input TEVV forwards reached your software at its expected
 rate, and every output `interface.py` wires was published by your software;
-the command and the estimate also reached the drone. Every topic in `watch` was published by your software, at its `min_hz` when it sets one. The command is not
-expected when TEVV flies your drone (`follow_waypoints()`), and a status only
+the command and the estimate also reached the drone. Every topic in `watch`
+was published by your software, at its `min_hz` when it sets one. The command
+is not expected when TEVV flies your drone (`follow_waypoints()`), and a status only
 has to be published (it may say nothing during the window). The verdict, the
 images it ran on, the files it checked and the rate of each topic are
 recorded in `onboarding.json`, and the stack becomes `ready`. Pinning other
@@ -856,9 +858,9 @@ casio-edge is a detection and depth stack of three containers. Discovery
 brings them up together:
 
 ```bash
-./tevv stack discover casio --image me/casio-edge:1 \
-    --also detection=me/casio-detection:1 --also-gpu detection \
-    --also da3=me/casio-da3:1 --also-gpu da3
+./tevv stack discover casio --image dhdevspace/auto_mns:casio-node \
+    --also detection=dhdevspace/auto_mns:casio-detection --also-gpu detection \
+    --also da3=dhdevspace/auto_mns:casio-da3 --also-gpu da3
 ./tevv stack rig casio --camera-info front=siyi_a8.yaml \
     --camera-mount front=0.15,0,-0.10,0,25,0
 ./tevv stack wire casio --autopilot px4 --watch /detections --watch /depth/image
