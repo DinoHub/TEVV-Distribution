@@ -187,11 +187,12 @@ only. `stack check` refuses a stack that sets it, and says so. Use TEVV's
 MAVROS topics, `/<drone>/mavros/...`, through the interface instead.
 
 A stack of three containers, two of them on the GPU and sharing a TensorRT
-engine cache:
+engine cache. The main one is keyed by the stack id, `casio`, as `stack wire`
+writes it:
 
 ```python
 containers = {
-    "casio-node": Container(image="dhdevspace/auto_mns:casio-node"),
+    "casio":      Container(image="dhdevspace/auto_mns:casio-node"),
     "detection":  Container(image="dhdevspace/auto_mns:casio-detection",
                             gpu=True, volumes={"engines": "/engines"}),
     "da3":        Container(image="dhdevspace/auto_mns:casio-da3",
@@ -270,8 +271,9 @@ has a type the interface image does not have, which you fix by adding its
 package to `messages=`.
 
 `stack wire --watch TOPIC` (repeatable) writes the list for you. Without the
-flag, `interface.py` gets `# could watch:` comment lines for the outputs it
-found, so you can pick.
+flag it writes the list empty, so name every topic again when you wire again
+(the dashboard's Wire step sends the stack's own list), and `interface.py`
+gets `# could watch:` comment lines for the outputs it found, so you can pick.
 
 ### Sim-time lockstep
 
@@ -591,8 +593,9 @@ stop and come back.
    stack id to record the image for that stack; without an id it only
    builds.
 2. **discover** starts the image (`--image IMAGE`, required: the image
-   prepare-image printed), waits for its ROS graph to settle (`--timeout S`,
-   default 60), and lists each node with the topics it subscribes to and
+   prepare-image printed), waits for its ROS graph to settle (unchanged for
+   `--settle S` seconds, 1 to 600, default 5, within `--timeout S`, default
+   60), and lists each node with the topics it subscribes to and
    publishes, with their types. `--command CMD` says what starts your
    software when the image's own command is not it, and `--gpu` runs it with
    the GPU. A stack of several containers names the others with
@@ -600,6 +603,12 @@ stop and come back.
    for that one): every image runs together, as it will in a run, and the
    discovery records each as a container. The stack's folder is mounted
    read-only at `/stack` in all of them, so its `files/` is `/stack/files`.
+   A container that starts its nodes late (one that builds a TensorRT
+   engine first) needs a longer `--settle`, or its topics are missing. When
+   your nodes publish nothing beyond the topics every node has, discover
+   warns: a command that waits for the simulator (a take-off gate) shows only
+   the gate, so discover a command that starts your nodes directly and add
+   the gate back in `interface.py`.
    The stack's folder is made when it is missing. When the discovery did not settle or its
    container exited, or the image differs from the one prepared, `wire`
    still writes `interface.py` but warns you to discover again.
@@ -607,7 +616,10 @@ stop and come back.
 4. **wire** matches the discovered topics to what the rig gives the drone,
    and writes `stacks/<id>/interface.py`: one `forward`, `command_from` or
    `estimate_from` line per match, and a `# not wired:` comment for a topic
-   left over. It writes every container discovery recorded. `--watch TOPIC`
+   left over. It writes every container discovery recorded, each with
+   `run_as="image"`: discover runs them as the image's own user, so that is
+   what it proved works (under the default, `platform`, the host user with
+   `HOME=/tmp`, an image that writes to its own folders fails). `--watch TOPIC`
    (repeatable) adds an output of your software to `watch`
    ([Watching outputs of any type](#watching-outputs-of-any-type)); without
    it, `# could watch:` lines list the candidates.
@@ -826,7 +838,10 @@ yours to fix:
 - Your stamps are more than 5 s behind or ahead of simulation time. Set
   `use_sim_time` in your nodes.
 - A container of yours exited. The reason gives its exit code and its last
-  log lines.
+  log lines; one in a restart loop "keeps restarting", with its last exit
+  code. Containers are named as `interface.py` names them. When one of yours
+  is down, the reasons leave out the hint about the stack's ROS domain: the
+  crash is why none of your nodes appeared.
 
 **Could not check (exit 2).** Nothing is recorded and the stack keeps its
 status: the problem is on TEVV's side, or the run never got far enough to
@@ -860,16 +875,21 @@ brings them up together:
 ```bash
 ./tevv stack discover casio --image dhdevspace/auto_mns:casio-node \
     --also detection=dhdevspace/auto_mns:casio-detection --also-gpu detection \
-    --also da3=dhdevspace/auto_mns:casio-da3 --also-gpu da3
+    --also da3=dhdevspace/auto_mns:casio-da3 --also-gpu da3 --settle 30
 ./tevv stack rig casio --camera-info front=siyi_a8.yaml \
     --camera-mount front=0.15,0,-0.10,0,25,0
 ./tevv stack wire casio --autopilot px4 --watch /detections --watch /depth/image
 ```
 
-`wire` writes the three containers, with `gpu=True` on `detection` and `da3`
-and an `engines` volume on both (add the volume by hand: discovery cannot know
-it), and `watch = ["/detections", "/depth/image"]` so the live check judges
-the two outputs TEVV has no wiring line for. Give `/depth/image` a
+The detector builds its TensorRT engine for about 20 s before its node
+starts, so `--settle 30` waits for it; with the default 5 s its `/detections`
+is missing from the graph.
+
+`wire` writes the three containers, the main one keyed `casio` after the
+stack id, all with `run_as="image"` and `gpu=True` on `detection` and `da3`,
+and `watch = ["/detections", "/depth/image"]` so the live check judges
+the two outputs TEVV has no wiring line for. Add the `engines` volume to
+`detection` and `da3` by hand: discovery cannot know it. Give `/depth/image` a
 `Watch(..., min_hz=5)` if a slow depth stream should fail the check. The
 camera is the SIYI A8, from its `camera_info` file, mounted 0.15 m ahead and
 0.10 m below the body origin and tilted 25 degrees down.
