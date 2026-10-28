@@ -13,8 +13,8 @@ repeats: 1                     # optional, default 1
 ```
 
 The scenario says what happens: the world, the drones and each drone's
-mission with its observers, authored in ScenarioLab (observers in the
-dashboard). The stacks say who flies and how. The test binds them. A drone
+mission, authored in ScenarioLab, and what is judged: observers on the run,
+the drones, their cameras and the missions (set in the dashboard). The stacks say who flies and how. The test binds them. A drone
 with a mission that the test leaves out is flown by `tevv-default`; a drone
 named in `drones` must have a mission. Tests are yours, like stacks: TEVV
 ships none, and git ignores `tests/`. The schema is
@@ -44,8 +44,8 @@ mission on `tevv-default`.
 
 Before anything starts, a run refuses: a drone that is not in the scenario
 or has no mission, an unknown or invalid stack, a drone that lacks a sensor
-its stack needs, PX4 and ArduPilot in one scenario, and a mission whose
-judged observers its stack or drone cannot feed. Results are described in
+its stack needs, PX4 and ArduPilot in one scenario, and a judged observer
+(on the drone or its mission) its stack or drone cannot feed. Results are described in
 [results.md](results.md).
 
 ## A suite: a kind of test
@@ -85,5 +85,5 @@ needs, say) is skipped with the reason; the others still fly.
 
 The examples (`suites/local-planner`, `suites/vio`, `suites/stack`) are
 starting points to copy, not a standard: what passes is yours to decide, in
-each mission's observers. To fly a scenario with different stacks on
+the scenario's observers. To fly a scenario with different stacks on
 different drones, write a test instead.

@@ -153,7 +153,9 @@ mission and judges it on ground truth, and flies nothing):
    and the verdict is unchanged.
 
 Each mission has its own **test segment**, from its hand-over to its end.
-Its observers are computed over that segment, on its own drone's data.
+Its observers, and its drone's, are computed over that segment, on that
+drone's data. A camera's, the run's and a drone with no mission's are
+computed over the whole run.
 Take-off and landing are segments of their own, judged only by observers
 with `phase: takeoff` or `phase: landing`
 ([results.md](results.md#take-off-and-landing)). The run ends when every

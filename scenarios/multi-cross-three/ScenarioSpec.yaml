@@ -48,6 +48,11 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: false
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 0
 - id: drone_2
   name: Drone2
   runtime_name: Drone2
@@ -74,6 +79,11 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: false
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 0
 - id: drone_3
   name: Drone3
   runtime_name: Drone3
@@ -100,6 +110,11 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: false
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 0
 - id: drone_4
   name: Drone4
   runtime_name: Drone4
@@ -137,10 +152,6 @@ missions:
   - [0, 6, 2.5]
   - [-10, 6, 2.5]
   observers:
-  - id: no-crash
-    type: collisions
-    check:
-      max: 0
   - id: goals
     type: goals_reached
     check:
@@ -155,10 +166,6 @@ missions:
   - [-5, 0, 4.5]
   - [-5, 12, 4.5]
   observers:
-  - id: no-crash
-    type: collisions
-    check:
-      max: 0
   - id: goals
     type: goals_reached
     check:
@@ -173,10 +180,6 @@ missions:
   - [-1, 11, 6.5]
   - [-9, 1, 6.5]
   observers:
-  - id: no-crash
-    type: collisions
-    check:
-      max: 0
   - id: goals
     type: goals_reached
     check:

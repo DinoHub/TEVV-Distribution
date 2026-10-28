@@ -56,6 +56,10 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: true
+  observers:
+  - id: no-crash
+    type: collisions
+    check: {max: 0}
 
 missions:
 - id: test
@@ -68,9 +72,6 @@ missions:
   timeout_s: 180
   reach_radius_m: 1.0
   observers:
-  - id: no-crash
-    type: collisions
-    check: {max: 0}
   - id: goals
     type: goals_reached
     check: {min: 1.0}

@@ -84,6 +84,23 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: false
+  observers:
+  - id: no-crash
+    type: collisions
+    check: {max: 0}
+  - id: final-drift
+    type: estimate_final_drift
+    check: {max: 3.0}
+  - id: yaw-drift
+    type: estimate_yaw_drift
+    check: {max: 2.0}
+  - id: scale
+    type: estimate_scale_error
+    check: {max: 5.0}
+  - id: ate
+    type: estimate_ate
+  - id: path
+    type: path_length
 extensions:
   mns.authoring_app:
     mode: "packaged_exe"
@@ -118,18 +135,3 @@ missions:
   - [0, 0, 5]
   timeout_s: 240
   speed_mps: 2.0
-  observers:
-  - id: no-crash
-    type: collisions
-    check: {max: 0}
-  - id: final-drift
-    type: estimate_final_drift
-    check: {max: 3.0}
-  - id: yaw-drift
-    type: estimate_yaw_drift
-    check: {max: 2.0}
-  - id: scale
-    type: estimate_scale_error
-    check: {max: 5.0}
-  - {id: ate, type: estimate_ate}
-  - {id: path, type: path_length}

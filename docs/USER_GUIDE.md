@@ -92,7 +92,7 @@ docker ps -a --filter name=mns-recorder- -q | xargs -r docker rm -f
 ## 1. How MnS fits together
 
 ```
- ScenarioLab ──export──▶ ScenarioSpec ─────────────┐        world, drones, missions (+ observers, set in the dashboard)
+ ScenarioLab ──export──▶ ScenarioSpec ─────────────┐        world, drones, missions (+ observers on the run, drones, cameras, missions; set in the dashboard)
  (Unreal editor)          scenarios/<s>/            │
                                                     ▼
  your stacks ─────────▶ stacks/<id>/interface.py ─▶ tests/<t>.yaml ──run──▶ N runs ──▶ metrics service ──▶ verdict
@@ -315,8 +315,8 @@ Open **Scenario Configuration**. A stepper runs across the top:
 ```
 
 Every step is required: a scenario is one test (its missions, one per drone
-that flies, and each mission's observers), and Run flies it with the stack
-you pick for each drone.
+that flies, and its observers on the run, the drones, their cameras and the
+missions), and Run flies it with the stack you pick for each drone.
 
 Each step unlocks when the previous one is done and then shows a check mark.
 The whole loop takes about 15 minutes the first time.
@@ -466,16 +466,24 @@ stack of its own with the stack the test names for each drone (see
 
 The scenario is the test: each drone's mission (its points, reach radius,
 speed and time budget) is authored in ScenarioLab's **Missions** tab, and
-shown here read-only. This step picks what each mission is judged on: its
-**observers**, from TEVV's catalog (collisions, goals reached, clearance,
-estimate accuracy and more), each with a check (*at most*, *at least*,
-*equal to* a value) or none (reported only). With several missions, pick
-the mission at the top first. **Phase** picks what an observer judges: the
-mission (the default), or the stack's take-off or landing (not the
-goal-based types). **Save observers** writes them into the
-scenario's `ScenarioSpec.yaml` and regenerates the stack. A mission passes
-when every observer with a check passes; a run passes only when every
-mission does. Who flies each drone is set by a test file (Step 2).
+shown here read-only. This step picks what the run is judged on: its
+**observers**, from TEVV's catalog, each with a check (*at most*, *at least*,
+*equal to* a value) or none (reported only). Each observer sits on what it
+judges; pick that on the left first:
+
+- **Run**: the simulation as a whole (how fast it kept up).
+- **A drone**: what it did and what its stack produced (collisions,
+  clearance, smoothness, estimate accuracy, plans). Most checks go here.
+- **One of its cameras**: the frame rate it really delivered.
+- **A mission**: its progress (goals reached, time to goal).
+
+The list offers only the types that fit. **Phase** (a mission, or a drone
+that flies one) picks the mission (the default), or the stack's take-off or
+landing. **Save observers** writes them into the scenario's
+`ScenarioSpec.yaml` and regenerates the stack. A mission passes when every
+observer with a check passes on it, its drone and its cameras; a run passes
+only when every mission does and the run's own observers pass. Who flies
+each drone is set by a test file (Step 2).
 
 ### Step 2: Run
 

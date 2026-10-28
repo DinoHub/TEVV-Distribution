@@ -84,6 +84,18 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: true
+  observers:
+  - id: no-crash
+    type: collisions
+    check: {max: 0}
+  - id: clearance
+    type: cloud_clearance
+    check: {min: 0.3}
+  - id: ate
+    type: estimate_ate
+    check: {max: 1.5}
+  - id: final-drift
+    type: estimate_final_drift
 extensions:
   mns.authoring_app:
     mode: "packaged_exe"
@@ -107,16 +119,6 @@ missions:
   timeout_s: 240
   reach_radius_m: 1.0
   observers:
-  - id: no-crash
-    type: collisions
-    check: {max: 0}
   - id: goals
     type: goals_reached
     check: {min: 1.0}
-  - id: clearance
-    type: cloud_clearance
-    check: {min: 0.3}
-  - id: ate
-    type: estimate_ate
-    check: {max: 1.5}
-  - {id: final-drift, type: estimate_final_drift}

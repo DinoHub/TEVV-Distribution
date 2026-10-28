@@ -88,6 +88,25 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: false
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 0
+  - id: path
+    type: path_length
+    check:
+      max: 60
+  - id: ate
+    type: estimate_ate
+    check:
+      max: 1.0
+  - id: available
+    type: estimate_availability
+    check:
+      min: 0.9
+  - id: rpe
+    type: estimate_rpe
 extensions:
   mns.authoring_app:
     mode: "packaged_exe"
@@ -117,22 +136,3 @@ missions:
   - [0, 0, 2]
   timeout_s: 240
   speed_mps: 1.5
-  observers:
-  - id: no-crash
-    type: collisions
-    check:
-      max: 0
-  - id: path
-    type: path_length
-    check:
-      max: 60
-  - id: ate
-    type: estimate_ate
-    check:
-      max: 1.0
-  - id: available
-    type: estimate_availability
-    check:
-      min: 0.9
-  - id: rpe
-    type: estimate_rpe
