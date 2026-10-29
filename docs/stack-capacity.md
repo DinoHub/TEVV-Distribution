@@ -11,7 +11,7 @@ The notes under the table say what happened on an earlier layout of the ten dron
 ## What was measured
 
 - **Template.** `ov-exact`: an OpenVINS stereo stack with two 30 Hz pinhole cameras (`cam0`, `cam1`), rendered at the stack's exact calibration.
-- **One stack per drone.** Each drone flies its own copy of the template (`cap-01` to `cap-NN`) on ArduPilot, on the XFS yard, one 6 m square each at 2.5 m. Lockstep is ArduPilot only; PX4 is refused.
+- **One stack per drone.** Each drone flies its own copy of the template (`cap-01` to `cap-NN`) on ArduPilot, on the XFS yard, one 6 m square each at 2.5 m. Lockstep runs on ArduPilot or SimpleFlight, not PX4 (refused).
 - **Reached.** A run reaches the rate when the stack's own lowest camera rate, measured inside the stack in simulation time, is at least 95% of the rate asked, and under lockstep no capture slot was missed.
 - **Free** means the simulation runs at its own pace and the cameras publish whatever the host can render.
 - **Lockstep** means the simulation holds at each capture slot until every camera frame is delivered, so each camera gets its full rate in simulation time and a slow step costs wall time, never flight time.
