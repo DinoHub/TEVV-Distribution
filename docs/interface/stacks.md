@@ -187,12 +187,35 @@ built again on every run. A host path on the left is not accepted (put team
 files in `files/`, which is `/stack/files`), and neither is a path under
 `/stack`, `/shared`, `/cfg` or `/mns/out`, which TEVV mounts itself.
 
-`fcu=True` is accepted but nothing can honour it yet. It would give the
-container its own MAVLink link to the drone's autopilot (so that it could run
-its own MAVROS), and no autopilot offers a second link: PX4's router endpoints
-belong to TEVV and AirSim, and ArduPilot's SITL serves MAVROS on tcp 5760
-only. `stack check` refuses a stack that sets it, and says so. Use TEVV's
-MAVROS topics, `/<drone>/mavros/...`, through the interface instead.
+`fcu=True` gives the container its own MAVLink link to the drone's PX4, beside
+the one TEVV's MAVROS holds. It works only when PX4 runs in bridge mode, in its
+own container network. In host network mode it is refused, and the message
+says to use bridge mode.
+
+The container gets a private network shared only with its drone's autopilot.
+It also gets `MNS_FCU_URL`, a UDP URL (`udp://:14565@px4-drone-<N>:14565`) for
+the endpoint on that network. Use only that URL. Run the stack's MAVROS like
+this:
+
+```bash
+ros2 run mavros mavros_node --ros-args -r __ns:=/fcu -p fcu_url:=$MNS_FCU_URL \
+    -p system_id:=1 -p component_id:=197 -p tgt_system:=1 -p tgt_component:=1
+```
+
+Bare `name:=value` arguments are not ROS 2 parameters, so MAVROS would ignore
+them; pass each one as `-p name:=value` after `--ros-args`. The router
+delivers messages by component id, so the stack's MAVROS needs its own (197),
+different from TEVV's.
+
+Only one container per stack may set `fcu=True`: the router endpoint tracks a
+single peer, so `stack check` refuses a second. Commands sent over this link
+bypass TEVV's command gate, so the team is responsible for them. TEVV's own
+services on the drone's network can still reach the endpoint.
+
+ArduPilot is refused for now. Its image serves one MAVLink link (tcp 5760),
+and first needs an env, `MAVLINK_STACK_TCP_PORT`, that makes it open a second
+TCP serial link; the message names it. Until then, use TEVV's MAVROS topics,
+`/<drone>/mavros/...`, through the interface instead.
 
 A stack of three containers, two of them on the GPU and sharing a TensorRT
 engine cache. The main one is keyed by the stack id, `casio`, as `stack wire`
