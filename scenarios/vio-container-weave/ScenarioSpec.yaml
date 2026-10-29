@@ -64,6 +64,29 @@ vehicles:
       spawn_source_actor: MnS_Drone_drone_2147482206
       spawn_frame: ros2_flu
       spawn_frame_actor: PlayerStart
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 10
+  - id: ate
+    type: estimate_ate
+    check:
+      max: 1
+  - id: available
+    type: estimate_availability
+    check:
+      min: 0.9
+  - id: rpe
+    type: estimate_rpe
+  - id: first-estimate
+    type: time_to_first_estimate
+  - id: takeoff-ate
+    type: estimate_ate
+    phase: takeoff
+  - id: takeoff-first-estimate
+    type: time_to_first_estimate
+    phase: takeoff
 missions:
 - id: test
   drone: Drone1
@@ -85,32 +108,10 @@ missions:
   speed_mps: 1.5
   timeout_s: 240
   observers:
-  - id: no-crash
-    type: collisions
-    check:
-      max: 10
   - id: goals
     type: goals_reached
     check:
       min: 1
-  - id: ate
-    type: estimate_ate
-    check:
-      max: 1
-  - id: available
-    type: estimate_availability
-    check:
-      min: 0.9
-  - id: rpe
-    type: estimate_rpe
-  - id: first-estimate
-    type: time_to_first_estimate
-  - id: takeoff-ate
-    type: estimate_ate
-    phase: takeoff
-  - id: takeoff-first-estimate
-    type: time_to_first_estimate
-    phase: takeoff
 object_clutter:
   seed: 42
   density: none

@@ -84,6 +84,16 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: true
+  observers:
+  - id: no-crash
+    type: collisions
+    check: {max: 0}
+  - id: ate
+    type: estimate_ate
+    check: {max: 1.0}
+  - id: available
+    type: estimate_availability
+    check: {min: 0.9}
 extensions:
   mns.authoring_app:
     mode: "packaged_exe"
@@ -109,16 +119,7 @@ missions:
   timeout_s: 180
   reach_radius_m: 1.0
   observers:
-  - id: no-crash
-    type: collisions
-    check: {max: 0}
   - id: goals
     type: goals_reached
     check: {min: 1.0}
-  - id: ate
-    type: estimate_ate
-    check: {max: 1.0}
-  - id: available
-    type: estimate_availability
-    check: {min: 0.9}
   - {id: to-goal, type: time_to_goal}

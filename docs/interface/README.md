@@ -6,7 +6,9 @@ TEVV is four layers, each one file you can read:
 ScenarioLab ──► scenarios/<s>/ScenarioSpec.yaml   WHAT happens     the world, the drones (airframe, sensors,
                                                                     start), each drone's mission (its points,
                                                                     reach radius, time budget)
-dashboard  ──►    └─ each mission's observers      HOW it is judged (the one thing the dashboard edits)
+dashboard  ──►    └─ observers                     HOW it is judged, each on what it judges: the run, a drone,
+                                                                    one of its cameras, a mission (the one thing
+                                                                    the dashboard edits)
 you        ──► stacks/<id>/interface.py           WHO flies, HOW   the autopilot, the sensors it needs, your
                                                                     containers, and the code that wires TEVV's
                                                                     topics to yours (Python, TEVV SDK)
@@ -20,7 +22,7 @@ you        ──► tests/<t>.yaml                     WHICH stack flies WHICH 
 | bring your software: write a stack's `interface.py`; how a run goes, take-off to landing | [stacks.md](stacks.md) |
 | know every topic a drone offers and what you send back | [topics.md](topics.md) |
 | bind stacks to a scenario's drones, run, run a suite on your stack | [tests.md](tests.md) |
-| read the verdicts: observers (of the mission, take-off or landing), how a run is judged | [results.md](results.md) |
+| read the verdicts: observers (on the run, a drone, a camera, a mission; take-off and landing), how a run is judged | [results.md](results.md) |
 
 TEVV ships no stack but its own: `tevv-default` (TEVV's follower flies the
 mission on SimpleFlight; `tevv-default-px4` and `tevv-default-ardupilot` on

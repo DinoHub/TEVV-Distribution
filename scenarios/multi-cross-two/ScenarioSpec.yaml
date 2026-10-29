@@ -65,6 +65,19 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: false
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 0
+  - id: ate
+    type: estimate_ate
+    check:
+      max: 1.0
+  - id: available
+    type: estimate_availability
+    check:
+      min: 0.9
 - id: drone_2
   name: Drone2
   runtime_name: Drone2
@@ -91,6 +104,11 @@ vehicles:
     barometer: true
     magnetometer: true
     gpu_lidar: true
+  observers:
+  - id: no-crash
+    type: collisions
+    check:
+      max: 0
 missions:
 - id: survey
   drone: Drone1
@@ -102,22 +120,10 @@ missions:
   - [-10, 10, 2]
   - [-2, 10, 2]
   observers:
-  - id: no-crash
-    type: collisions
-    check:
-      max: 0
   - id: goals
     type: goals_reached
     check:
       min: 1.0
-  - id: ate
-    type: estimate_ate
-    check:
-      max: 1.0
-  - id: available
-    type: estimate_availability
-    check:
-      min: 0.9
 - id: cross
   drone: Drone2
   type: waypoints
@@ -128,10 +134,6 @@ missions:
   - [-5, -3, 5]
   - [-8, -8, 5]
   observers:
-  - id: no-crash
-    type: collisions
-    check:
-      max: 0
   - id: goals
     type: goals_reached
     check:
