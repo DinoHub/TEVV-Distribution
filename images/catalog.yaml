@@ -160,7 +160,7 @@ images:
   v1_authoring:
     repo: dhdevspace/auto_mns
     tag: "mns-authoring-v1.1.0-dev-1a59625"
-    digest: sha256:0879661ed964ea09a4c2e2fbff3fb234f06f6058e645ecdda284fc03483491bd
+    digest: sha256:334bb02dc38f2450686ee9f091c94c1a9bd3655284a4a8a9a103bed21ed3f2ca
     channel: pinned
     purpose: >-
       MnS 1.0 ScenarioLab (TEVV-Authoring integration/v1.0.0 e821a2f074fc; v1.0.0 candidate: #25 spawn clearance, CableComponent), built kit-only with --kit <v1_runtime_host_kit> --strict and no waivers (labels tevv.authoring.kit_image / tevv.authoring.shared_set_id): the nine shared Scenario* plugins, UDS and the preview content come from that kit (TEVV-Airsim dea429015355); SDK 1.0.0rc5; reopen keeps placed pack objects (F3). Bakes mns_vehicle_models 1.0.4 (sha256:317a6dd7...), the version the product lock pins. Level packs are staged from the PackStore.
@@ -173,11 +173,14 @@ images:
       the same kit and waiver: the Runtime tab has no Autopilot, Endpoint or
       Managed controls, and a saved ScenarioSpec carries no runtime.profile or
       runtime.autopilot (a file that has them keeps them).
+      Rebuilt under the same tag from feat/v1.1-object-observers 14cea7c (#44),
+      the same kit and waiver: a drone's mission is edited under that drone in
+      Vehicles; no Missions tab.
 
   v1_stacks:
     repo: dhdevspace/auto_mns
     tag: "mns-stacks-v1.1.0-dev-63d1bc6"
-    digest: sha256:c73a2d0cedad9867ce235a36f5f91fa5036e74e6b3274ff31fd942a24f74aa98
+    digest: sha256:47817f5534020bf890299a3ca1dc08827471ee14a992a7fbd03488060379e5c3
     channel: pinned
     purpose: >-
       mns-stacks (MnS-Integration-Platform platform/stacks, ENTRYPOINT
@@ -225,11 +228,16 @@ images:
       stack flies from take-off to landing (its interface), the mission's
       supervisor only referees, observers take a phase. Rebuilt from b0e721e: a vehicle
       start without a frame is AirSim NED.
+      Rebuilt from feat/v1.1-object-observers a8eaf16 (#167): observers on what
+      they judge (the run, a drone, a camera, a mission), the metrics service the
+      only judge; no Scoring(checks=) or capacity settings; one capacity probe
+      per drone; tevv scenario migrate-observers; ScenarioSpec from
+      MnS-ScenarioSpec 45f44ed (#11).
 
   v1_interface:
     repo: dhdevspace/auto_mns
     tag: "tevv-interface-v1.1.0-dev"
-    digest: sha256:11a41eb74154cf1fe5a0e74f2828f935295ba1f1fb8bad6b5b79e26836c9002c
+    digest: sha256:e6ab6e81e2daeb208b0a873cf8689e3069c246d29216c0cb8228f68e0793ebcd
     channel: pinned
     source:
       repo: DinoHub/MnS-Integration-Platform
@@ -243,6 +251,7 @@ images:
       and the dashboard backend. v1.1 development build of
       feat/multi-drone-missions 550c23b (#154); later dev builds reuse the tag.
       Now 0f8eb68: one interface serves every drone of a many-drone stack.
+      Now a8eaf16 (#167): Scoring takes plan only (no checks).
 
   v1_packs:
     repo: dhdevspace/auto_mns
@@ -297,7 +306,7 @@ images:
   v1_dashboard_backend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-backend-v1.1.0-dev-bf6922a"
-    digest: sha256:b08aa30a2674a5d64165b37c4007dacae327a65330fe1e5c61ee582f18ba5f7e
+    digest: sha256:58635f624929a1f03635729142d10b06ade2ce0b7587a10ca88f44672f3ea899
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -336,11 +345,14 @@ images:
       drone is shown in Run; stacks and suites are files run from the CLI).
       Rebuilt from c151d06 (#142): Run picks each drone's stack and saves it
       into the test file.
+      Rebuilt from feat/v1.1-object-observers c0be5b4 (#149): observers edited
+      and results shown by owner (the run, each drone with its mission and
+      cameras); no capacity settings in Run.
 
   v1_dashboard_frontend:
     repo: dhdevspace/auto_mns
     tag: "tevv-web-dashboard-frontend-v1.1.0-dev-bf6922a"
-    digest: sha256:435fa88d7865e052e64a610a30c87c4844402d9b4a8e4e40f1af95aca9bad8e2
+    digest: sha256:e0709bf9e98ba9f441898f92fb36015bf360a068e5690396e3eb66c9322927bd
     channel: pinned
     source:
       repo: DinoHub/TEVV-Web-Dashboard
@@ -352,11 +364,12 @@ images:
       Rebuilt from TEVV-Web-Dashboard feat/multi-drone-missions bf6922a (#142),
       the same commit as the backend. Rebuilt under the same tag from
       e3ce7c5 (#142), with the backend; again from 9db1651, and c151d06.
+      Rebuilt from c0be5b4 (#149), with the backend.
 
   metrics_service:
     repo: dhdevspace/auto_mns
     tag: "tevv-jsonl-ingest-v0.5.0-gcfe09f6"
-    digest: sha256:d8bb6d98409e767fc0ea45cba2f5737862a991eaad3aa68dc525340aad76b44f
+    digest: sha256:537bfcf4b96495ff663642819edb6263eb840b9376aa28571d3a7b34d3413d4c
     channel: pinned
     source:
       repo: DinoHub/TEVV-Metrics
@@ -381,6 +394,10 @@ images:
       jsonl_ingestor 0.5.0 judges every mission of a run on its own observers.
       Rebuilt under the same tag from 8b9b6b8 (#22): an observer says what it
       needs from the stack (needs.output estimate|command, needs.sensor).
+      Rebuilt under the same tag as jsonl_ingestor 0.6.0 (TEVV-Metrics
+      feat/v1.1-object-observers ded5aaf, #23 on #22): evaluation config v2,
+      observers judged per owner (simulation, drone, camera, mission), camera_rate
+      and sim_speed, a null verdict when nothing is checked.
 
 consumers:
   # Empty in v1.0.0: its one row (airsim-tools) was removed. product-images.env
