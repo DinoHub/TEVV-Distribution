@@ -192,6 +192,23 @@ images:
       pilot's goals and whether it reached them, for the metrics service to
       judge goal reached from.
 
+  v1_interface:
+    repo: dhdevspace/auto_mns
+    tag: "tevv-interface-v1.1.0-dev-lockcap.2"
+    digest: sha256:eea4ce9b457112c5c365f70cdac0d420740886671002cbcb0f2e27d7b2d5cc1c
+    channel: pinned
+    purpose: >-
+      tevv-interface (MnS-Integration-Platform platform/stacks/component_adaptor):
+      runs each stack's interface.py in its drone's interface container. mns-stacks
+      takes it from TEVV_INTERFACE_IMAGE (else its own default, the moving
+      tevv-interface-v1.1.0-dev tag). v1.1 development build of
+      MnS-Integration-Platform 7f89d38 (feat/v1.1-stack-lockstep-capacity, #165, on
+      #162 and #161): an exact camera's frames resampled to the team's calibration
+      with its true camera_info; under sim-time lockstep (TEVV_SIM_TIME=1 from the
+      generator) every interface timer that measures flight progress counts
+      simulation seconds (autopilot waits, the follower's route, the command-silence
+      hold). Pair with an mns-stacks build of the same merge.
+
   v1_packs:
     repo: dhdevspace/auto_mns
     tag: "mns-packs-v1.1.0-dev-c2e9510"
@@ -330,6 +347,7 @@ consumers:
       vars:
         MNS_PACKS_IMAGE: v1_packs
         MNS_STACKS_IMAGE: v1_stacks
+        TEVV_INTERFACE_IMAGE: v1_interface
         MNS_AUTHORING_IMAGE: v1_authoring
         MNS_RUNTIME_HOST_IMAGE: v1_runtime_host
         MNS_RUNTIME_HOST_KIT_IMAGE: v1_runtime_host_kit
