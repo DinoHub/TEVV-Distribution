@@ -54,8 +54,10 @@ missions:
 Add them in the dashboard (Observers step: the run, each drone with its
 cameras, each mission; **Phase** picks the phase), or write them in the
 scenario's `ScenarioSpec.yaml`. ScenarioLab, which authors the world, the
-drones and the missions, keeps them as they are. A sensor profile's camera
-may carry observers too: every drone with that profile gets them. A copy of
+drones and the missions, keeps them as they are. A drone owns its sensors:
+a camera's observers sit on the drone's camera
+(`vehicles[].cameras.<camera>.observers`), also when the camera's settings
+come from a sensor profile. A profile carries no observers. A copy of
 vehicle 1 made by a test's `vehicle_count` keeps its cameras' observers, so
 "every camera of every drone at 27 Hz" holds for the copies too.
 
@@ -69,7 +71,8 @@ ahead of time.
 A scenario written before observers sat on what they judge lists drone
 checks on its missions; TEVV refuses those and says where they go.
 `./tevv scenario migrate-observers <scenario>` moves them onto the drone
-(and the run's onto `runtime`), keeping the file's comments.
+(and the run's onto `runtime`), keeping the file's comments. It also takes
+an older scenario still written as one `test` with `observers`.
 
 ## Take-off and landing
 
@@ -98,7 +101,7 @@ own alignment over it). For example:
 
 A phased observer keeps its own column in the results, and its result
 carries `phase`. A run with no such segment (a take-off that never
-started) skips it, with the reason. Each mission's
+started) cannot measure it: it fails, with the reason. Each mission's
 `missions/<mission>.json` lists its `segments` (`takeoff`, `mission`,
 `landing`, each with its start, end and how it ended) and `landing` (how the
 landing ended). A `land_timeout` does not change the mission's verdict.
@@ -134,8 +137,13 @@ ended in error, which fails it. A run's `ended` is its
 worst mission's (`error`, then `interface_error`, `takeoff_failed`,
 `stopped`, `timeout`, then `completed`).
 
-An observer the run cannot measure (no geofence in the scenario, no estimate
-published) is **skipped** with the reason, and does not fail the run.
+An observer with a check that the run cannot measure (no estimate published,
+the capacity probe found no frames from a camera, no take-off segment, a
+drone the record has nothing of) **fails with the reason**, so a broken run
+never passes. Its result says `unmeasured: true`; the dashboard lists such
+results apart, under **Couldn't be measured**, and the results table names
+them `<column> not measured (<why>)`. An observer without a check that
+cannot be measured is reported without a value.
 
 ## Observer types
 
@@ -234,17 +242,17 @@ The results table has one row per run per mission, so you see the spread.
 The table has one row per run per mission: `run`, `mission`, `drone`,
 `stack` (who flew it), `ended`, `verdict`, `failed` (each failed observer),
 `goals` (points reached), then one column per observer with the value it
-was judged on: the mission's and its drone's by id, its cameras' as
-`<camera>.<id>`, and on every row the run's as `run.<id>` and those of a
-drone with no mission as `<drone>.<id>` (a name that clashes with a built-in
-column gets ` (observer)`). A scenario with one mission gives one row per
+was judged on, named by what it judged so no two collide: a mission's as
+`<mission>.<id>`, a drone's as `<drone>.<id>`, a camera's as
+`<drone>/<camera>.<id>`, and on every row the run's as `run.<id>`. A scenario with one mission gives one row per
 run.
 
 Per run, the metrics service's `evaluated.json` holds the run's verdict
 (`null`: not judged), every observer result with its `owner` and
 `owner_key` (`simulation`, `Drone1`, `Drone1/front`, `mission:survey`) and,
 when it belongs to one, its `mission` and `drone`
-(`{id, type, label, unit, value, check, passed, skipped, reason}`),
+(`{id, type, label, unit, value, check, passed, unmeasured, reason}`;
+`unmeasured: true` with `passed: false` when its check could not be measured),
 `checks` keyed `<owner key>/<id>`, `owners` (each owner's verdict), and
 `missions`: each mission's verdict, failure reason and observers. The run's
 folder under `generated/campaigns/<test>/runs/<run>/` holds:
