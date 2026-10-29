@@ -39,8 +39,9 @@ run the same script again; it skips whatever is already done.
    1. Type a name in **Scenario** and press Enter.
    2. **Environment** → **Level Pack** `warehouse` → **Apply Level Pack**.
    3. **Vehicles**: aim the screen centre at the floor → **Add Drone**.
-   4. **Missions**: pick the drone → **Add mission** → aim at the floor and
-      **Add point** two or three times → set **Timeout s** (e.g. 120).
+   4. Still in **Vehicles**, under **Mission of Drone1**: **Add mission** → aim
+      at the floor and **Add point** two or three times → set **Timeout s**
+      (e.g. 120).
    5. **Validate** → **Validate**, then **Export**. *Export is the only save.*
 4. Back in the dashboard, click your scenario under **Authored scenarios**.
 5. **Generate**: **Generate stack**.
@@ -376,8 +377,9 @@ you ask, and never while its stack or its test is running.
 | **F10** | Hide or show the side panel. |
 
 **Building a scenario.** The side panel has a **Scenario** name field, then
-these tabs: **Environment**, **Vehicles**, **Sensor Profiles**, **Objects**,
-**Spawns**, **Degradation**, **Missions**, **Runtime** and **Validate**. Work through them in
+these tabs: **Environment**, **Vehicles** (each drone and its mission),
+**Sensor Profiles**, **Objects**, **Spawns**, **Degradation**, **Runtime** and
+**Validate**. Work through them in
 this order:
 
 1. **Scenario** (top field): type a name and press Enter. The name becomes the
@@ -412,7 +414,9 @@ this order:
 7. **Spawns** / **Degradation** *(optional)*: add random-clutter volumes, and
    zones that degrade sensors or weather (GPS jamming or spoofing, urban
    canyon, fog, gale, …).
-8. **Missions**: the test. Pick a **Drone** → **Add mission**; set
+8. **Mission** (under **Vehicles**): the test, one per drone. Select the drone
+   in the Vehicles list or in the level; **Mission of <drone>** below shows
+   its mission. **Add mission**; set
    **Mission id**, **Reach m** (how close counts as reached, default 1),
    **Speed m/s** (optional; TEVV's own flight flies at it) and **Timeout s**
    (from the hand-over); then **Height m** and **Add point** for each point,
@@ -465,8 +469,8 @@ stack of its own with the stack the test names for each drone (see
 ### Step 1c: Observers
 
 The scenario is the test: each drone's mission (its points, reach radius,
-speed and time budget) is authored in ScenarioLab's **Missions** tab, and
-shown here read-only. This step picks what the run is judged on: its
+speed and time budget) is authored in ScenarioLab under that drone
+(**Vehicles**), and shown here read-only. This step picks what the run is judged on: its
 **observers**, from TEVV's catalog, each with a check (*at most*, *at least*,
 *equal to* a value) or none (reported only). Each observer sits on what it
 judges; pick that on the left first:
@@ -474,8 +478,9 @@ judges; pick that on the left first:
 - **Run**: the simulation as a whole (how fast it kept up).
 - **A drone**: what it did and what its stack produced (collisions,
   clearance, smoothness, estimate accuracy, plans). Most checks go here.
-- **One of its cameras**: the frame rate it really delivered.
-- **A mission**: its progress (goals reached, time to goal).
+  - **Its mission** (listed under it): its progress (goals reached, time to
+    goal).
+  - **One of its cameras**: the frame rate it really delivered.
 
 The list offers only the types that fit. **Phase** (a mission, or a drone
 that flies one) picks the mission (the default), or the stack's take-off or
@@ -1038,7 +1043,7 @@ ls runs/                 # runs; bag in <run>/bag/
 make dashboard-down             # stop the dashboard
 ```
 
-**The flow:** Content → Author (Launch editor · Environment → Vehicles →
-Missions → Sensor Profiles → Validate → **Export**) → **Generate stack** →
+**The flow:** Content → Author (Launch editor · Environment → Vehicles (and
+each drone's mission) → Sensor Profiles → Validate → **Export**) → **Generate stack** →
 Observers → **Run** (a test, or the scenario on its own) → Monitor (watch) →
 verdict and bag in `generated/campaigns/<test>/runs/<run>/`
