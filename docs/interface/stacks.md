@@ -296,6 +296,9 @@ in the scenario) the simulation holds time at each slot until your stack has
 caught up, so a slow step costs wall time, never flight time. Outside
 lockstep the declaration does nothing.
 
+Measured capacity, from one drone to ten stacks flown together, is in
+[Stack capacity](../stack-capacity.md).
+
 - `ack_on`: a topic on your side that goes quiet while your software is busy
   (say, blocked in a replan) and keeps publishing when it is idle. Any message
   there tells TEVV your stack has caught up with the latest sim time. A
@@ -309,7 +312,8 @@ lockstep the declaration does nothing.
   slot. `participant` (default: the stack's id) names your waits in the logs.
 
 The mission's budgets (take-off, mission, landing) count sim seconds under
-lockstep.
+lockstep, and so do the interface's own timers: TEVV's waypoint follower,
+the hold after a silence in your commands, and the autopilot's waits.
 
 ## setup(): wiring
 
@@ -349,7 +353,7 @@ the full catalog is in [topics.md](topics.md).
 | --- | --- |
 | `forward(src, "/topic", convert=fn, frame_id=..., encoding=..., max_hz=...)` | Republish an input on your side. `convert` turns each message into anything (any type). A camera also publishes its `camera_info` (beside the image, or `info=`). |
 | `forward(self.stereo, left="/cam0/image_raw", right="/cam1/image_raw")` | Both cameras of a pair. |
-| `on(src, callback)` | Your function gets each message (a pair gets `callback(left, right)`). |
+| `on(src, callback)` | Your function gets each message (a pair gets `callback(left, right)`). An exact camera's frames arrive resampled, as `forward` publishes them. |
 | `subscribe("/topic", MsgType, callback)` / `publisher("/topic", MsgType)` | Your own topics on your side. |
 | `command_from("/topic", type=None, frame="ENU", convert=fn)` | Your command, sent to TEVV. `PositionTarget`, `Twist(Stamped)` (`frame="FLU"` for body velocities), `PoseStamped` or `Odometry`; the type is found from the topic. |
 | `send_position(x, y, z, yaw=None)` / `send_velocity(vx, vy, vz, yaw_rate=None, frame="world")` / `send_command(msg)` | Fly from your own code. |
@@ -395,8 +399,8 @@ event. It never flies the drone. Per drone:
    mission ends `error`.
 3. **Mission.** TEVV publishes the points, `control_state` turns
    `external`, and `on_start(d)` is called. Your commands now reach the
-   autopilot through the interface's gate; after 1 s without one, the drone
-   holds.
+   autopilot through the interface's gate; after 1 s without one (1 s of
+   simulation time under lockstep), the drone holds.
 4. **End.** At the first of: every point reached, `done`, an error, the
    time budget, a stop. The gate closes and `on_end(d, reason)` is called.
 5. **Landing.** TEVV calls your `land(d)` step; when it returns, the drone
@@ -719,7 +723,7 @@ stacks/<id>/
   files/                your own files, read by your containers at /stack/files
   rig/
     rig.yaml            the sensors: cameras, IMU, lidar, where they sit on the drone
-    fit.json            the fit report: your values, the simulator's, the differences
+    fit.json            the fit report: your values, the simulator's, the differences (kept current from rig.yaml)
     kalibr-*.yaml       the Kalibr files you gave, copied beside it
   onboarding.json       what onboarding did so far
 ```
@@ -779,25 +783,78 @@ any problem with the topic or rate names you gave.
 The simulator renders a pinhole camera from a horizontal field of view
 (square pixels, the centre of the image as the principal point, no
 distortion), and its fisheye path takes Kannala-Brandt and double sphere
-calibrations as they are. So your camera is either rendered exactly or by
-the closest thing the simulator can draw, and `stack rig` says which for each
-camera. `rig/fit.json` keeps your values, the simulator's, and the
-differences (simulator minus yours, in pixels).
+calibrations as they are. A camera that does not fit those is not drawn
+as a lookalike. TEVV renders it wider and resamples it to your calibration
+(below), though a camera that needs a fisheye render gets this only
+[in lockstep](#the-live-check-in-lockstep). So your camera is either exact or,
+in a few cases, a closest match,
+and `stack rig` says which for each camera. `rig/fit.json` keeps your values,
+the simulator's, and the differences (simulator minus yours, in pixels). TEVV
+fits the rig again each time it generates a stack or shows the fit, so what you
+see is what runs; `fit.json` is rewritten when it differs (after a TEVV update
+that fits a camera differently, or when it is missing or damaged).
 
 | Their model | Rendered as | Match |
 |---|---|---|
 | pinhole + equidistant (Kannala-Brandt) | fisheye, Kannala-Brandt series with their coefficients | exact |
 | double sphere | fisheye, double sphere with their xi and alpha | exact |
-| pinhole + radtan (or none), narrower than 90 degrees | pinhole, focal from the mean of fx and fy | closest: fx, fy, centre and distortion differences reported |
-| pinhole + radtan, 90 degrees or wider | fisheye with a tangent series that imitates a pinhole | closest, with the projection error reported |
+| pinhole, square pixels, centred, no distortion, under 90 degrees across | pinhole at your field of view | exact |
+| the same at 90 degrees across or wider (the simulator's pinhole stops below 90) | in lockstep: fisheye whose Kannala-Brandt series is the pinhole's, then resampled. Free: the closest-match pinhole | exact, by resampling, in lockstep only |
+| pinhole + radtan, or fx different from fy, or a principal point more than half a pixel off centre | pinhole rendered wider at your focal length (the smaller of fx and fy), then resampled | exact, by resampling |
+| the same, when the widened render would be 90 degrees or wider | in lockstep: fisheye rendered at the wider view, then resampled. Free: the closest-match pinhole | exact, by resampling, in lockstep only |
 | omni, eucm | not supported | refused |
 
-`stack rig` refuses a camera of those models (exit 1, naming the camera,
-with the fit of the others; nothing is written); recalibrate with Kalibr's
-pinhole-radtan, pinhole-equi or double sphere (`ds-none`) models. For a
-closest match, read the reported differences before you trust a comparison
-against your real recordings: a distortion the simulator does not draw is a
-real difference in what your software sees.
+**Resampling.** The interface container resamples each frame of such a camera
+to your fx, fy, cx and cy and your radtan distortion, and publishes a
+`camera_info` with your values instead of the simulator's. Your software
+sees the image size and calibration you gave. This is automatic in `forward`
+and in `on` (your callback gets the resampled frame, and a pair gets both
+resampled); `interface.py` does not change. A wide camera such as a ZED is
+exact too, in lockstep: a 1280x720 ZED-like camera is rendered as a 1676x946
+fisheye of 108.3 degrees corner to corner and resampled from that. Free, the
+same camera is the closest-match pinhole, and its summary says
+"(resampled to your calibration under lockstep)": the fisheye route is too slow
+to deliver the camera's rate without lockstep. Rig fisheye renders use the
+shared cubemap, one per mount point. A rig fisheye flown free on the shared
+cubemap has not been measured on this release, so no rate is given for it.
+`stack rig` prints what
+it will do, for example
+`camera left: resampled to your calibration (rendered 1344x768, 87.9 degrees across)`
+or `(rendered as a fisheye 1676x946, 108.3 degrees corner to corner)`. A
+pinhole render's field of view is measured across the image; a fisheye
+render's from corner to corner, as the simulator's fisheye takes it.
+
+Resampling costs CPU in the interface container, about 13 ms per frame for a
+640x480 camera (measured in a live check). The container logs
+`camera <name>: resampling takes N.N ms per frame` every 10 seconds. If a
+frame arrives at a size other than the planned render, it passes through
+unresampled with the simulator's `camera_info`, and the container warns once.
+
+**Closest match.** TEVV refuses the resampling, and the camera stays a
+closest match, when the render would need:
+
+- more than 4096 pixels on a side,
+- more than twice your pixel count,
+- a fisheye field of view over 220 degrees, or
+- a distortion that does not invert at the image corners.
+
+The reason is in the camera's notes, and the summary names the differences,
+for example `closest match: fx differs by +2.0 px, distortion error 3.4 px`.
+The distortion error is the larger of your distortion the simulator does not
+draw and, for a camera 90 degrees or wider, how far the fisheye render lands
+from a true pinhole at the image corners.
+Read them before you trust a comparison against your real recordings: a
+distortion the simulator does not draw is a real difference in what your
+software sees.
+
+The fit is shown in `stack rig` and `stack show` (`fit`), in each run's
+`interface.json` (`inputs.cameras[<name>].fit`), and in the dashboard's Rig
+step, Rig tab, Overview and Live check. The
+[live check](#the-live-check) records it per camera.
+
+`stack rig` refuses a camera of the unsupported models (exit 1, naming the
+camera, with the fit of the others; nothing is written); recalibrate with
+Kalibr's pinhole-radtan, pinhole-equi or double sphere (`ds-none`) models.
 
 ### Statuses
 
@@ -814,11 +871,16 @@ and the dashboard's Stacks page shows the same word.
 A stack you onboard stays `not checked` until you run
 [the live check](#the-live-check).
 
+A stack's `ready` is for the mode it was checked in, free or
+[in lockstep](#the-live-check-in-lockstep). A stack checked only in lockstep
+is not shown to deliver its camera rate in free runs.
+
 ### The live check
 
 ```bash
 ./tevv stack live-check my-stack
 ./tevv stack live-check my-stack --seconds 60 --keep
+./tevv stack live-check my-stack --lockstep
 ```
 
 It flies your stack once on a scenario TEVV ships (the onboarding check), so
@@ -839,6 +901,7 @@ records nothing else and scores nothing.
 | --- | --- |
 | `--seconds S` | How long the topics are watched once the drone is handed to your stack (default 20). It cannot be longer than the check mission (150 s). |
 | `--timeout S` | How long the check flight may run before it fails. By default it is what a campaign allows the check mission: about 990 s, and 20 times that when your stack runs sim-time lockstep (the simulation then runs slower than the clock on the wall). Give a number above 0 to use another. |
+| `--lockstep` | Fly the check in sim-time lockstep ([below](#the-live-check-in-lockstep)). The dashboard's Live check step has the same choice, "Run in lockstep". |
 | `--keep` | Leave the check stack running afterwards, the simulator included, to look at its logs (the probe may still be running in its interface container). |
 | `--progress FILE` | Append the check's progress to FILE as JSON lines, the same `run.phase` events a campaign's runs write (`run_key` is `live-check-<id>`), plus the phase `watching` when TEVV starts watching the topics (its `detail` says whether from the hand-over or on the ground). A stop file in FILE's folder (`campaign.stop`, the marker that stops a campaign's run) stops the check: it ends as not judged (`flight_failed`, "stopped by the user") and records nothing. |
 
@@ -873,9 +936,10 @@ was published by your software, at its `min_hz` when it sets one. The command
 is not expected when TEVV flies your drone (`follow_waypoints()`), and a status only
 has to be published (it may say nothing during the window). The verdict, the
 images it ran on, the files it checked and the rate of each topic are
-recorded in `onboarding.json`, and the stack becomes `ready`. Pinning other
+recorded in `onboarding.json` (with each camera's fit under `cameras`; a camera that is only a closest match adds a note, never a failure), and the stack becomes `ready`. Pinning other
 images takes that back (`needs fix`), and so does editing `interface.py` or
-the rig, by hand or with `wire` and `rig` (`not checked`); run the check
+the rig, by hand or with `wire` and `rig`, or a TEVV update that fits a camera
+differently (exact or closest, resampled or not) (`not checked`); run the check
 again.
 
 **Fail (exit 1).** The verdict is recorded with one reason per problem, each
@@ -931,6 +995,35 @@ case:
 | `tevv_short` | The simulator delivered an input below half its expected rate, or not at all, or TEVV published nothing on it or could not read its rate. Free the GPU of other simulators and run the check again. |
 | `probe_failed` | TEVV's probe could not run, ended without a result (the error gives its exit code and last lines), or was still running at the end (the interface container may be stuck). Rebuild the interface image, or set `TEVV_INTERFACE_IMAGE` to one that starts, then run the check again. |
 | `refused` | Nothing flew: a built-in stack, a stack that fails `stack check`, a stack on its drone's ROS domain, or a `--seconds` or `--timeout` out of range. |
+
+
+### The live check in lockstep
+
+```bash
+./tevv stack live-check my-stack --lockstep
+```
+
+This flies the check in sim-time lockstep. The simulator waits for every
+camera frame on a grid at the rig's highest camera rate (30 Hz when the rig
+has no camera), so each camera delivers its full rate in simulation time.
+Rates are judged per simulation second. The check runs slower than real time:
+about 0.4 to 0.5 times real time for one drone in TEVV's tests, and more
+cameras or drones slow it further.
+How much slower with ten drones, each with its own stack, is in
+[Stack capacity](../stack-capacity.md).
+
+- **ArduPilot or SimpleFlight only.** Lockstep needs a steppable clock. A PX4
+  stack is refused before anything flies. Switch with
+  `tevv stack wire <id> --autopilot ardupilot`.
+- **Cameras are captured on the grid.** The rig's cameras go through shared
+  memory (a pinhole camera's topic is then the shared-memory one). Every camera
+  is captured at the grid rate, and your stack still receives only the rate it
+  asks for (`max_hz`).
+- **Exact cameras.** A camera that needs a fisheye render (90 degrees or wider
+  once widened) is resampled to your calibration only in lockstep. Free, it is
+  the closest-match pinhole ([the fit report](#the-fit-report-exact-or-closest)).
+- **The record says which mode flew.** `onboarding.json` holds `lockstep`, and
+  a stack's status compares the fit of the mode it was checked in.
 
 ### Deleting a stack
 
