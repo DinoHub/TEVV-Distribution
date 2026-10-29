@@ -4,9 +4,9 @@ Whether a machine can onboard N drones, each flown by its own autonomy stack, an
 
 ## The answer
 
-Ten drones, each with its own OpenVINS stereo stack: nine of the ten flew the whole square at the full 30 Hz at the stack in lockstep, with no missed capture slots; one did not take off. It takes about 21 minutes of wall time per minute of mission on this host. Flying free, none of them reach 30 Hz: one drone gets 16.3 Hz, and the rate falls roughly as one over the number of drones (3.1 Hz at ten).
+Ten drones, each with its own OpenVINS stereo stack, all flew the whole square at the full 30 Hz at the stack in lockstep, with no missed capture slots. It takes about 22 minutes of wall time per minute of mission on this host. Flying free, none of them reach 30 Hz: one drone gets 16.3 Hz, and the rate falls roughly as one over the number of drones (3.0 Hz at ten).
 
-The notes under the table say what is known about the drone that did not take off and about the two that touched containers. Lockstep gives the rate, not real time: the stack sees time at the right rate because the simulation waits for it.
+The notes under the table say what happened on an earlier layout of the ten drones. Lockstep gives the rate, not real time: the stack sees time at the right rate because the simulation waits for it.
 
 ## What was measured
 
@@ -27,16 +27,15 @@ The notes under the table say what is known about the drone that did not take of
 | 2 | lockstep | 29.8 Hz (99%) | 0 | 0.2848 | 3.5 | 560 | 785% | 94%, 8741 MiB | 2 of 2 passed; points reached 5 of 5 each | yes |
 | 5 | free | 7.5 Hz (25%) | not counted | 1.0005 | 1.0 | 205 | 1752% | 91%, 6728 MiB | 5 of 5 passed | no |
 | 5 | lockstep | 29.8 Hz (99%) | 0 | 0.1552 | 6.4 | 1045 | 1159% | 98%, 12476 MiB | 5 of 5 passed; points reached 5 of 5 each | yes |
-| 10 | free | 3.1 Hz (10%) | not counted | 0.9915 | 1.0 | 235 | 1900% | 64%, 8384 MiB | 7 of 10 passed | no |
-| 10 | lockstep | 29.8 Hz (99%) on the 9 that flew | 0 | 0.0468 | 21.4 | 4810 | 1829% | 100%, 15832 MiB | 7 of 10 passed; points reached 5 of 5 on the 9 that flew | rate yes; 1 drone did not take off |
+| 10 | free | 3.0 Hz (10%) | not counted | 0.9987 | 1.0 | 225 | 1802% | 65%, 7496 MiB | 10 of 10 passed | no |
+| 10 | lockstep | 29.8 Hz (99%) | 0 | 0.0459 | 21.8 | 3440 | 2482% | 100%, 15832 MiB | 10 of 10 passed; points reached 5 of 5 each | yes |
 
-Peak CPU is the sum over all containers (100% is one core). Peak GPU is utilisation and memory used. Missions: how many drones passed their mission (it ended without touching anything), and under lockstep the points reached of the square's five. The wall time column is seconds; wall minutes per mission minute is one divided by the real-time factor. Free at ten drones, Drone4, Drone7 and Drone8 touched shipping containers in the yard during their squares.
+Peak CPU is the sum over all containers (100% is one core). Peak GPU is utilisation and memory used. Missions: how many drones passed their mission (it ended without touching anything), and under lockstep the points reached of the square's five. The wall time column is seconds; wall minutes per mission minute is one divided by the real-time factor. The one-, two- and five-drone rows were flown on an earlier layout, whose squares at those counts stayed clear of the yard's containers (all passed).
 
 ### Notes on ten drones in lockstep
 
-- Nine of the ten drones flew the whole square. Every camera of those nine reached 29.8 to 30.1 Hz at the stack, with no missed slots.
-- Drone4 and Drone8 flew all five points but touched shipping containers in the XFS yard near the edge of their squares, so they fail the no-crash check. The same two (and Drone7) touched containers in the free ten-drone run. The ten-drone layout puts some squares too close to the yard's containers: a layout matter, not lockstep.
-- Drone7 did not take off. Its ArduPilot never started using GPS within the 240 s (simulation time) take-off budget, so it never gave a position and could not arm. This happened to Drone7 in both ten-drone lockstep runs and to Drone3 once; never at five or fewer drones and never in free runs. The cause is not yet known.
+- An earlier 12 m grid, four drones wide, flew some squares into the yard's containers, in free and lockstep runs alike. The layout now keeps every square in the clear area (two columns 12 m apart, rows 9 m apart), which limits a run to at most 10 drones on XFS. The ten-drone rows above were flown on the new layout.
+- On the earlier layout, in two of three ten-drone lockstep runs, one drone's ArduPilot never started using GPS within the 240 s (simulation time) take-off budget, so it never gave a position and could not take off. Both such drones stood in a column on lower ground that the new layout no longer uses, and it did not recur on the new layout. The cause is not established.
 - GPU memory reached 15832 of 16303 MiB. Ten drones with two cameras each is near this card's memory limit.
 - The accepted hold (`r.Fisheye.LockstepHold 0`) is not usable at ten drones: in two attempts every drone's ground truth read the same height, about 175 to 185 m off, from the start, and no mission flew.
 - The first attempt failed before flight: TEVV's ready wait gave up at 240 s while probing ten stacks one after another under load. The ready wait now probes each drone's bridge once per pass and waits longer under lockstep.
@@ -54,11 +53,11 @@ Peak CPU is the sum over all containers (100% is one core). Peak GPU is utilisat
 
 ## Conclusions
 
-- Free running on this host: with this template no drone count reaches 30 Hz at the stack, not even one drone (16.3 Hz). The rate falls roughly as one over N: 16.3, 14.5, 7.5 and 3.1 Hz for 1, 2, 5 and 10 drones.
-- Lockstep: every drone count tested delivers the full 30 Hz at the stack with no missed slots. At ten drones, nine of the ten flew the whole square at the full 30 Hz at the stack; one did not take off, for a reason not yet known.
-- The cost is wall time. A minute of mission takes about 2.4 minutes with one drone, 3.5 with two, 6.4 with five and 21.4 with ten.
+- Free running on this host: with this template no drone count reaches 30 Hz at the stack, not even one drone (16.3 Hz). The rate falls roughly as one over N: 16.3, 14.5, 7.5 and 3.0 Hz for 1, 2, 5 and 10 drones.
+- Lockstep: every drone count tested delivers the full 30 Hz at the stack with no missed slots. At ten drones, all ten flew the whole square at the full 30 Hz at the stack.
+- The cost is wall time. A minute of mission takes about 2.4 minutes with one drone, 3.5 with two, 6.4 with five and 21.8 with ten.
 - Lockstep gives the rate, not real time.
-- At ten drones the card's memory is nearly full and one drone did not take off, for a reason not yet known.
+- At ten drones the card's memory is nearly full (15832 of 16303 MiB).
 
 ## Host
 
@@ -85,6 +84,6 @@ python3 tools/stack-capacity/capacity.py run --dir /data/capacity/n10 --mode fre
 python3 tools/stack-capacity/capacity.py run --dir /data/capacity/n10 --mode lockstep --grid-hz 30
 ```
 
-Without `--timeout`, the tool's wall cap scales with the number of drones and the mode: 3600 s free, 900 + 600 s per drone in lockstep (6900 s at ten drones; the ten-drone lockstep run took 4810 s). On a slower host give more, for example `--timeout 7200` or above.
+Without `--timeout`, the tool's wall cap scales with the number of drones and the mode: 3600 s free, 900 + 600 s per drone in lockstep (6900 s at ten drones; the ten-drone lockstep run took 3440 s). On a slower host give more, for example `--timeout 7200` or above.
 
 Prepare clones the template into one stack per drone and writes the scenario and test. Each run flies the test with `mns-stacks campaign run`, probes every stack from inside, and appends its rows to `results.md` in the output folder.
